@@ -502,3 +502,6 @@ http-client.private.env.json
 *.vsix
 
 ################################################################################
+
+# Codex planning documents
+/docs/superpowers/
