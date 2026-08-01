@@ -37,6 +37,8 @@ Use project subagents only when specialization or independent parallel work mate
 - Use `implementer` for ambiguous multi-step features and difficult root-cause fixes.
 - Use `reviewer` after substantial implementation or before a pull request.
 - Handle trivial edits and sequential work in the primary thread; do not delegate for ceremony.
+- Only the primary agent may spawn subagents; custom agents must not delegate further.
+- Treat role `sandbox_mode` values as defaults. Parent live permission overrides can supersede them, so use a read-only parent mode when review or exploration must be mechanically write-protected.
 - Keep the primary agent responsible for scope decisions, integration, fresh verification, and the final answer.
 
 (Yes, this file also applies to agents working on the ponytail repo itself. Especially to them.)

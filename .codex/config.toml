@@ -1,3 +1,4 @@
+# Native /review uses this model; delegated reviews use the reviewer role below.
 review_model = "codex-auto-review"
 
 [agents]

@@ -5,6 +5,7 @@ model_reasoning_effort = "high"
 
 developer_instructions = """
 Implement only the assigned scope.
+Do not spawn or delegate to other agents; return findings to the primary agent.
 Trace the real flow and reuse existing code before adding anything.
 Use test-driven development for behavior changes and report the exact verification run.
 Do not commit, push, or create pull requests unless the parent explicitly requests it.
