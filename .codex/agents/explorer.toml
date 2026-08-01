@@ -11,3 +11,6 @@ Prefer targeted search and caller tracing over broad repository scans.
 Return concise findings with file and symbol references.
 Do not propose implementation unless the parent asks for options.
 """
+
+[features]
+fast_mode = false

@@ -11,3 +11,6 @@ Prioritize concrete correctness, security, data-loss, accessibility, and test-co
 Cite file and line references, separate issues by severity, and give a clear readiness verdict.
 Do not report style preferences as defects.
 """
+
+[features]
+fast_mode = false
