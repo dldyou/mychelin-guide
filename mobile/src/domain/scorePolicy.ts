@@ -1,13 +1,13 @@
 import type { ScorePolicy } from './types';
 
-export const DEFAULT_SCORE_POLICY: ScorePolicy = {
+export const DEFAULT_SCORE_POLICY: ScorePolicy = Object.freeze({
   menuTasteWeight: 0.7,
   menuValueWeight: 0.3,
   visitMenuWeight: 0.6,
   visitServiceWeight: 0.2,
   visitAtmosphereWeight: 0.2,
   sequenceDecay: 0.8,
-};
+});
 
 export function normalizePolicy(policy: ScorePolicy): ScorePolicy {
   const weights = [
@@ -34,7 +34,12 @@ export function normalizePolicy(policy: ScorePolicy): ScorePolicy {
   const visitWeightTotal =
     policy.visitMenuWeight + policy.visitServiceWeight + policy.visitAtmosphereWeight;
 
-  if (menuWeightTotal <= 0 || visitWeightTotal <= 0) {
+  if (
+    !Number.isFinite(menuWeightTotal) ||
+    !Number.isFinite(visitWeightTotal) ||
+    menuWeightTotal <= 0 ||
+    visitWeightTotal <= 0
+  ) {
     throw new Error('Each score weight group must have a positive total.');
   }
 

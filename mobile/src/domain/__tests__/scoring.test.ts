@@ -30,6 +30,7 @@ describe('score policy', () => {
   it.each([
     { menuTasteWeight: -1 },
     { menuTasteWeight: 0, menuValueWeight: 0 },
+    { menuTasteWeight: Number.MAX_VALUE, menuValueWeight: Number.MAX_VALUE },
     { visitMenuWeight: 0, visitServiceWeight: 0, visitAtmosphereWeight: 0 },
     { sequenceDecay: 0 },
     { sequenceDecay: 1.01 },
@@ -90,14 +91,14 @@ describe('scoring', () => {
     ).toBe(2);
   });
 
-  it('rejects a visit with an invalid timestamp', () => {
-    expect(() =>
-      calculateRestaurantScore(
-        [{ score: 5, visitedAt: 'not-a-date' }],
-        DEFAULT_SCORE_POLICY,
-      ),
-    ).toThrow();
-  });
+  it.each(['not-a-date', '2026-02-30', 'July 30, 2026'])(
+    'rejects an invalid or non-ISO timestamp: %s',
+    (visitedAt) => {
+      expect(() =>
+        calculateRestaurantScore([{ score: 5, visitedAt }], DEFAULT_SCORE_POLICY),
+      ).toThrow();
+    },
+  );
 
   it('returns null for an empty restaurant and the score for one visit', () => {
     expect(calculateRestaurantScore([], DEFAULT_SCORE_POLICY)).toBeNull();
@@ -134,5 +135,22 @@ describe('scoring', () => {
         DEFAULT_SCORE_POLICY,
       ),
     ).toBe(4);
+  });
+
+  it('applies sequence weighting within both recent-change groups', () => {
+    const policy = { ...DEFAULT_SCORE_POLICY, sequenceDecay: 0.5 };
+
+    expect(
+      calculateRecentChange(
+        [
+          { score: 5, visitedAt: '2026-07-01' },
+          { score: 1, visitedAt: '2026-07-10' },
+          { score: 5, visitedAt: '2026-07-30' },
+          { score: 5, visitedAt: '2026-07-20' },
+          { score: 1, visitedAt: '2026-07-25' },
+        ],
+        policy,
+      ),
+    ).toBeCloseTo(1.5238, 4);
   });
 });

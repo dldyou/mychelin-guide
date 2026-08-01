@@ -1,8 +1,8 @@
 export type ScorePolicy = {
-  menuTasteWeight: number;
-  menuValueWeight: number;
-  visitMenuWeight: number;
-  visitServiceWeight: number;
-  visitAtmosphereWeight: number;
-  sequenceDecay: number;
+  readonly menuTasteWeight: number;
+  readonly menuValueWeight: number;
+  readonly visitMenuWeight: number;
+  readonly visitServiceWeight: number;
+  readonly visitAtmosphereWeight: number;
+  readonly sequenceDecay: number;
 };
