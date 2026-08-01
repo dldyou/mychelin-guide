@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -30,7 +30,7 @@ export default function RestaurantRegisterScreen() {
       router.replace({
         pathname: '/visit/new',
         params: { restaurantId: restaurant.id },
-      } as unknown as Href);
+      });
     } catch (cause) {
       setFormError(cause instanceof Error ? cause.message : '식당을 저장하지 못했습니다.');
     } finally {

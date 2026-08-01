@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -52,7 +52,7 @@ export default function RestaurantSearchScreen() {
               onPress={() => router.push({
                 pathname: '/visit/new',
                 params: { restaurantId: restaurant.id },
-              } as unknown as Href)}
+              })}
             />
           ))}
         </View>
