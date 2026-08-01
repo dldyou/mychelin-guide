@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { AppDataProvider } from '@/src/state/AppDataProvider';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -46,11 +47,16 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <AppDataProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="restaurant/search" options={{ title: '식당 찾기' }} />
+          <Stack.Screen name="restaurant/register" options={{ title: '식당 등록' }} />
+          <Stack.Screen name="visit/new" options={{ title: '방문 기록' }} />
+        </Stack>
+      </ThemeProvider>
+    </AppDataProvider>
   );
 }

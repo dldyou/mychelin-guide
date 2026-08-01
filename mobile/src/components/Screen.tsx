@@ -7,7 +7,9 @@ import { colors } from '@/src/theme/colors';
 export function Screen({ children }: PropsWithChildren) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>{children}</ScrollView>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {children}
+      </ScrollView>
     </SafeAreaView>
   );
 }
