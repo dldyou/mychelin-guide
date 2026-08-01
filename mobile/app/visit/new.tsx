@@ -135,7 +135,11 @@ export default function NewVisitScreen() {
     return (
       <Screen>
         <View style={styles.form}>
-          <Text accessibilityRole="alert" style={styles.error}>
+          <Text
+            accessibilityLiveRegion="assertive"
+            accessibilityRole="alert"
+            style={styles.error}
+          >
             {error?.message ?? '음식점을 찾을 수 없습니다.'}
           </Text>
           <Pressable
@@ -161,6 +165,20 @@ export default function NewVisitScreen() {
         <View accessibilityLabel="방문 시간대" accessibilityRole="radiogroup" style={styles.section}>
           <Text style={styles.heading}>방문 시간대</Text>
           <View style={styles.choiceRow}>
+            <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ checked: daypart === null }}
+              onPress={() => setDaypart(null)}
+              style={({ pressed }) => [
+                styles.choice,
+                daypart === null && styles.choiceSelected,
+                pressed && styles.buttonPressed,
+              ]}
+            >
+              <Text style={[styles.choiceText, daypart === null && styles.choiceTextSelected]}>
+                미선택
+              </Text>
+            </Pressable>
             {DAYPARTS.map((option) => {
               const selected = daypart === option.value;
               return (
@@ -307,7 +325,11 @@ export default function NewVisitScreen() {
           ) : null}
         </View>
 
-        {formError ? <Text accessibilityRole="alert" style={styles.error}>{formError}</Text> : null}
+        {formError ? (
+          <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>
+            {formError}
+          </Text>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"

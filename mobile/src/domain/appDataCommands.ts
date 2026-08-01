@@ -74,10 +74,12 @@ const validateVisitCommand = (data: AppData, command: AppendVisitCommand) => {
 export const appendVisit = (data: AppData, command: AppendVisitCommand): AppData => {
   validateVisitCommand(data, command);
   const newMenus = command.newMenus.map((menu) => ({ ...menu, name: menu.name.trim() }));
+  const visit = { ...command.visit, photoUris: [...command.visit.photoUris] };
+  const menuRatings = command.menuRatings.map((rating) => ({ ...rating }));
   return {
     ...data,
     menus: [...data.menus, ...newMenus],
-    visits: [...data.visits, command.visit],
-    menuRatings: [...data.menuRatings, ...command.menuRatings],
+    visits: [...data.visits, visit],
+    menuRatings: [...data.menuRatings, ...menuRatings],
   };
 };

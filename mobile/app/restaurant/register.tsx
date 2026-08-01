@@ -44,6 +44,7 @@ export default function RestaurantRegisterScreen() {
         <View style={styles.field}>
           <Text style={styles.label}>식당 이름</Text>
           <TextInput
+            accessibilityLabel="식당 이름 입력"
             onChangeText={setName}
             placeholder="식당 이름"
             placeholderTextColor={colors.muted}
@@ -54,6 +55,7 @@ export default function RestaurantRegisterScreen() {
         <View style={styles.field}>
           <Text style={styles.label}>분류</Text>
           <TextInput
+            accessibilityLabel="식당 분류 입력"
             onChangeText={setCategory}
             placeholder="예: 한식"
             placeholderTextColor={colors.muted}
@@ -64,6 +66,7 @@ export default function RestaurantRegisterScreen() {
         <View style={styles.field}>
           <Text style={styles.label}>주소</Text>
           <TextInput
+            accessibilityLabel="식당 주소 입력"
             onChangeText={setAddress}
             placeholder="주소"
             placeholderTextColor={colors.muted}
@@ -72,7 +75,11 @@ export default function RestaurantRegisterScreen() {
           />
         </View>
 
-        {formError ? <Text style={styles.error}>{formError}</Text> : null}
+        {formError ? (
+          <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>
+            {formError}
+          </Text>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"

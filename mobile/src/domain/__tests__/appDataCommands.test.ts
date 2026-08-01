@@ -298,4 +298,26 @@ describe('app data commands', () => {
     expect(data).toEqual(originalData);
     expect(command).toEqual(originalCommand);
   });
+
+  it('copies appended visit entities so later command mutations cannot change stored data', () => {
+    const command = commandWith({
+      photoUris: ['file:///meal.jpg'],
+    });
+    const next = appendVisit(createVisitData(), command);
+    const storedVisit = next.visits[next.visits.length - 1];
+    const storedMenu = next.menus[next.menus.length - 1];
+    const storedRating = next.menuRatings[next.menuRatings.length - 1];
+
+    command.visit.service = 1;
+    command.visit.photoUris[0] = 'file:///mutated.jpg';
+    command.newMenus[0].name = 'Mutated menu';
+    command.menuRatings[0].taste = 1;
+
+    expect(storedVisit).toMatchObject({
+      service: 4,
+      photoUris: ['file:///meal.jpg'],
+    });
+    expect(storedMenu.name).toBe('Dumplings');
+    expect(storedRating.taste).toBe(5);
+  });
 });

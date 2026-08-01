@@ -39,7 +39,11 @@ export default function RestaurantSearchScreen() {
         <View style={styles.results}>
           <Text style={styles.heading}>{isSearching ? '검색 결과' : '최근 식당'}</Text>
           {isLoading ? <Text style={styles.message}>식당 정보를 불러오는 중이에요.</Text> : null}
-          {error ? <Text style={styles.error}>{error.message}</Text> : null}
+          {error ? (
+            <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>
+              {error.message}
+            </Text>
+          ) : null}
           {!isLoading && !error && restaurants.length === 0 ? (
             <Text style={styles.message}>
               {isSearching ? '검색 결과가 없습니다.' : '등록된 식당이 없습니다.'}

@@ -91,6 +91,34 @@ describe('AppDataProvider', () => {
     expect(current.error).toBe(loadError);
   });
 
+  test('rejects mutations without saving after hydration fails', async () => {
+    const loadError = new Error('read failed');
+    mockedLoadAppData.mockRejectedValue(loadError);
+    await renderProvider();
+
+    let mutations!: Promise<unknown>[];
+    act(() => {
+      mutations = [
+        current.addRestaurant({ name: 'Soba' }),
+        current.addMenu({ restaurantId: 'missing', name: 'Cold soba' }),
+        current.addVisit({
+          restaurantId: 'missing',
+          service: 5,
+          atmosphere: 4,
+          menuRatings: [{ menuName: 'Cold soba', taste: 5, value: 4 }],
+        }),
+      ];
+    });
+
+    await act(async () => {
+      await Promise.all(mutations.map((mutation) => expect(mutation).rejects.toBe(loadError)));
+    });
+
+    expect(mockedSaveAppData).not.toHaveBeenCalled();
+    expect(current.data).toEqual(createEmptyAppData());
+    expect(current.error).toBe(loadError);
+  });
+
   test('publishes a restaurant only after persistence succeeds', async () => {
     let resolveSave!: () => void;
     mockedSaveAppData.mockReturnValue(new Promise((resolve) => {
@@ -337,5 +365,39 @@ describe('AppDataProvider', () => {
       expect.objectContaining({ visitId: visit.id, menuId: 'menu-existing', taste: 5, value: 4 }),
       expect.objectContaining({ visitId: visit.id, menuId: newMenu?.id, taste: 4, value: 3 }),
     ]);
+  });
+
+  test('does not expose the stored visit through the returned object', async () => {
+    mockedLoadAppData.mockResolvedValue({
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z' }],
+      menus: [{
+        id: 'menu-existing',
+        restaurantId: 'restaurant-1',
+        name: 'Cold soba',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      }],
+    });
+    mockedSaveAppData.mockResolvedValue();
+    await renderProvider();
+
+    let visit!: Visit;
+    await act(async () => {
+      visit = await current.addVisit({
+        restaurantId: 'restaurant-1',
+        service: 5,
+        atmosphere: 4,
+        photoUris: ['file:///meal.jpg'],
+        menuRatings: [{ menuId: 'menu-existing', taste: 5, value: 4 }],
+      });
+    });
+
+    visit.service = 1;
+    visit.photoUris[0] = 'file:///mutated.jpg';
+
+    expect(current.data.visits[0]).toMatchObject({
+      service: 5,
+      photoUris: ['file:///meal.jpg'],
+    });
   });
 });

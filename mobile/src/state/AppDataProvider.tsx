@@ -52,6 +52,7 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
   const [error, setError] = useState<Error | null>(null);
   const dataRef = useRef(data);
   const mutationQueue = useRef<Promise<void>>(Promise.resolve());
+  const hydrationErrorRef = useRef<Error | null>(null);
   const hydrationRef = useRef<{ promise: Promise<void>; resolve(): void } | null>(null);
   if (!hydrationRef.current) {
     let resolve!: () => void;
@@ -68,7 +69,11 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
     loadAppData().then((loadedData) => {
       dataRef.current = loadedData;
       setData(loadedData);
-    }).catch(setError).finally(() => {
+    }).catch((cause) => {
+      const error = cause instanceof Error ? cause : new Error('Failed to load app data.');
+      hydrationErrorRef.current = error;
+      setError(error);
+    }).finally(() => {
       setIsLoading(false);
       hydration.resolve();
     });
@@ -92,6 +97,7 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
   ): Promise<T> => {
     const mutation = mutationQueue.current.then(async () => {
       await hydration.promise;
+      if (hydrationErrorRef.current) throw hydrationErrorRef.current;
       const { nextData, result } = build(dataRef.current);
       await persist(nextData);
       return result;

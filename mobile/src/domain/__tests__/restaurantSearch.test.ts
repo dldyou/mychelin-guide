@@ -81,4 +81,46 @@ describe('searchRestaurants', () => {
       'unvisited',
     ]);
   });
+
+  it('uses the newest of multiple visits when ordering restaurants', () => {
+    const multipleVisitsData: AppData = {
+      restaurants: [
+        { id: 'repeat', name: 'Repeat Cafe', createdAt: '2026-01-01' },
+        { id: 'single', name: 'Single Cafe', createdAt: '2026-01-01' },
+      ],
+      menus: [],
+      visits: [
+        {
+          id: 'repeat-newest',
+          restaurantId: 'repeat',
+          visitedAt: '2026-08-01',
+          service: 4,
+          atmosphere: 4,
+          photoUris: [],
+        },
+        {
+          id: 'single-visit',
+          restaurantId: 'single',
+          visitedAt: '2026-07-01',
+          service: 4,
+          atmosphere: 4,
+          photoUris: [],
+        },
+        {
+          id: 'repeat-older',
+          restaurantId: 'repeat',
+          visitedAt: '2026-01-01',
+          service: 4,
+          atmosphere: 4,
+          photoUris: [],
+        },
+      ],
+      menuRatings: [],
+    };
+
+    expect(searchRestaurants(multipleVisitsData, '').map(({ id }) => id)).toEqual([
+      'repeat',
+      'single',
+    ]);
+  });
 });
