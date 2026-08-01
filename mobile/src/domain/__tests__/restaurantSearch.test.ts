@@ -55,4 +55,30 @@ describe('searchRestaurants', () => {
     expect(result).not.toBe(data.restaurants);
     expect(data.restaurants.map(({ id }) => id)).toEqual(originalOrder);
   });
+
+  it('sorts a pre-1970 visit ahead of a restaurant with no visits', () => {
+    const historicalData: AppData = {
+      restaurants: [
+        { id: 'unvisited', name: 'New Cafe', createdAt: '2026-01-01' },
+        { id: 'historical', name: 'Old Diner', createdAt: '1960-01-01' },
+      ],
+      menus: [],
+      visits: [
+        {
+          id: 'historical-visit',
+          restaurantId: 'historical',
+          visitedAt: '1969-12-31',
+          service: 4,
+          atmosphere: 4,
+          photoUris: [],
+        },
+      ],
+      menuRatings: [],
+    };
+
+    expect(searchRestaurants(historicalData, '').map(({ id }) => id)).toEqual([
+      'historical',
+      'unvisited',
+    ]);
+  });
 });

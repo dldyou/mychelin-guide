@@ -5,13 +5,15 @@ export function searchRestaurants(data: AppData, query: string): Restaurant[] {
   const newestVisits = new Map<string, number>();
   data.visits.forEach(({ restaurantId, visitedAt }) => {
     const timestamp = parseIsoDate(visitedAt);
-    if (timestamp > (newestVisits.get(restaurantId) ?? 0)) {
+    const previousVisit = newestVisits.get(restaurantId);
+    if (previousVisit === undefined || timestamp > previousVisit) {
       newestVisits.set(restaurantId, timestamp);
     }
   });
 
   const needle = query.trim().toLocaleLowerCase();
-  const newestVisit = (restaurantId: string) => newestVisits.get(restaurantId) ?? 0;
+  const newestVisit = (restaurantId: string) =>
+    newestVisits.get(restaurantId) ?? Number.NEGATIVE_INFINITY;
 
   return [...data.restaurants]
     .filter(({ name }) => name.toLocaleLowerCase().includes(needle))
