@@ -3,6 +3,7 @@ import {
   type PropsWithChildren,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -49,14 +50,34 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
   const [data, setData] = useState(createEmptyAppData);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const dataRef = useRef(data);
+  const mutationQueue = useRef<Promise<void>>(Promise.resolve());
+  const hydrationRef = useRef<{ promise: Promise<void>; resolve(): void } | null>(null);
+  if (!hydrationRef.current) {
+    let resolve!: () => void;
+    hydrationRef.current = {
+      promise: new Promise((complete) => {
+        resolve = complete;
+      }),
+      resolve: () => resolve(),
+    };
+  }
+  const hydration = hydrationRef.current;
 
   useEffect(() => {
-    loadAppData().then(setData).catch(setError).finally(() => setIsLoading(false));
-  }, []);
+    loadAppData().then((loadedData) => {
+      dataRef.current = loadedData;
+      setData(loadedData);
+    }).catch(setError).finally(() => {
+      setIsLoading(false);
+      hydration.resolve();
+    });
+  }, [hydration]);
 
   const persist = async (nextData: AppData) => {
     try {
       await saveAppData(nextData);
+      dataRef.current = nextData;
       setData(nextData);
       setError(null);
     } catch (cause) {
@@ -66,33 +87,43 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
     }
   };
 
-  const addRestaurant = async (
+  const enqueueMutation = <T,>(
+    build: (currentData: AppData) => { nextData: AppData; result: T },
+  ): Promise<T> => {
+    const mutation = mutationQueue.current.then(async () => {
+      await hydration.promise;
+      const { nextData, result } = build(dataRef.current);
+      await persist(nextData);
+      return result;
+    });
+    mutationQueue.current = mutation.then(() => undefined, () => undefined);
+    return mutation;
+  };
+
+  const addRestaurant = (
     input: Pick<Restaurant, 'name' | 'category' | 'address'>,
-  ): Promise<Restaurant> => {
-    const restaurant: Restaurant = {
+  ): Promise<Restaurant> => enqueueMutation((currentData) => {
+    const result: Restaurant = {
       ...input,
       id: createId('restaurant'),
       createdAt: new Date().toISOString(),
     };
-    const nextData = appendRestaurant(data, restaurant);
-    await persist(nextData);
-    return restaurant;
-  };
+    return { nextData: appendRestaurant(currentData, result), result };
+  });
 
-  const addMenu = async (input: Pick<Menu, 'restaurantId' | 'name'>): Promise<Menu> => {
-    const menu: Menu = {
-      ...input,
-      id: createId('menu'),
-      createdAt: new Date().toISOString(),
-    };
-    const nextData = appendMenu(data, menu);
-    await persist(nextData);
-    return menu;
-  };
+  const addMenu = (input: Pick<Menu, 'restaurantId' | 'name'>): Promise<Menu> =>
+    enqueueMutation((currentData) => {
+      const result: Menu = {
+        ...input,
+        id: createId('menu'),
+        createdAt: new Date().toISOString(),
+      };
+      return { nextData: appendMenu(currentData, result), result };
+    });
 
-  const addVisit = async (input: NewVisitInput): Promise<Visit> => {
+  const addVisit = (input: NewVisitInput): Promise<Visit> => enqueueMutation((currentData) => {
     const createdAt = new Date().toISOString();
-    const visit: Visit = {
+    const result: Visit = {
       id: createId('visit'),
       restaurantId: input.restaurantId,
       visitedAt: input.visitedAt ?? createdAt,
@@ -117,16 +148,15 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
       }
       return {
         id: createId('rating'),
-        visitId: visit.id,
+        visitId: result.id,
         menuId: menuId ?? '',
         taste: inputRating.taste,
         value: inputRating.value,
       };
     });
-    const nextData = appendVisit(data, { visit, newMenus, menuRatings });
-    await persist(nextData);
-    return visit;
-  };
+    const nextData = appendVisit(currentData, { visit: result, newMenus, menuRatings });
+    return { nextData, result };
+  });
 
   return (
     <AppDataContext.Provider value={{

@@ -111,6 +111,74 @@ describe('AppDataProvider', () => {
     expect(restaurant).toMatchObject({ name: 'Soba', category: 'Japanese', address: 'Seoul' });
   });
 
+  test('waits for hydration before applying a mutation to loaded data', async () => {
+    let resolveLoad!: (data: AppData) => void;
+    mockedLoadAppData.mockReturnValue(new Promise((resolve) => {
+      resolveLoad = resolve;
+    }));
+    let savedData!: AppData;
+    mockedSaveAppData.mockImplementation(async (nextData) => {
+      savedData = nextData;
+    });
+    const loaded: AppData = {
+      ...createEmptyAppData(),
+      restaurants: [{
+        id: 'restaurant-loaded',
+        name: 'Loaded restaurant',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      }],
+    };
+    await renderProvider();
+
+    let mutation!: Promise<Restaurant>;
+    act(() => {
+      mutation = current.addRestaurant({ name: 'New restaurant' });
+    });
+    await act(async () => Promise.resolve());
+
+    let restaurant!: Restaurant;
+    await act(async () => {
+      resolveLoad(loaded);
+      restaurant = await mutation;
+    });
+
+    expect(current.data.restaurants).toEqual([loaded.restaurants[0], restaurant]);
+    expect(savedData.restaurants).toEqual([loaded.restaurants[0], restaurant]);
+  });
+
+  test('serializes concurrent mutations against the latest persisted data', async () => {
+    const saves: Array<{ data: AppData; resolve(): void }> = [];
+    mockedSaveAppData.mockImplementation((nextData) => new Promise((resolve) => {
+      saves.push({ data: nextData, resolve });
+    }));
+    await renderProvider();
+
+    let firstMutation!: Promise<Restaurant>;
+    let secondMutation!: Promise<Restaurant>;
+    act(() => {
+      firstMutation = current.addRestaurant({ name: 'First' });
+      secondMutation = current.addRestaurant({ name: 'Second' });
+    });
+    await act(async () => Promise.resolve());
+
+    let first!: Restaurant;
+    await act(async () => {
+      saves[0].resolve();
+      first = await firstMutation;
+    });
+    expect(current.data.restaurants).toEqual([first]);
+    const secondSavedData = saves[1].data;
+
+    let second!: Restaurant;
+    await act(async () => {
+      saves[1].resolve();
+      second = await secondMutation;
+    });
+
+    expect(secondSavedData.restaurants).toEqual([first, second]);
+    expect(current.data.restaurants).toEqual([first, second]);
+  });
+
   test('keeps restaurant state unchanged and exposes the error when persistence fails', async () => {
     const saveError = new Error('disk full');
     mockedSaveAppData.mockRejectedValue(saveError);
