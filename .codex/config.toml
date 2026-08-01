@@ -1,0 +1,19 @@
+review_model = "codex-auto-review"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
+default_subagent_model = "gpt-5.6-terra"
+default_subagent_reasoning_effort = "medium"
+
+[agents.implementer]
+description = "Implement complex features and debug issues that need deep reasoning."
+config_file = "./agents/implementer.toml"
+
+[agents.reviewer]
+description = "Review completed changes for correctness, security, regressions, and missing tests."
+config_file = "./agents/reviewer.toml"
+
+[agents.explorer]
+description = "Explore the codebase, trace callers, and gather evidence without changing files."
+config_file = "./agents/explorer.toml"

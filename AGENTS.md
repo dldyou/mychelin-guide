@@ -29,4 +29,14 @@ Rules:
 
 Not lazy about: understanding the problem (read it fully and trace the real flow before picking a rung, a small diff you don't understand is just laziness dressed up as efficiency), input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal, a clock drifts, a sensor reads off), anything explicitly requested. Lazy code without its check is unfinished: non-trivial logic leaves ONE runnable check behind, the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
 
+## Model routing
+
+Use project subagents only when specialization or independent parallel work materially improves the result:
+
+- Use `explorer` for read-heavy codebase tracing, documentation checks, and evidence gathering.
+- Use `implementer` for ambiguous multi-step features and difficult root-cause fixes.
+- Use `reviewer` after substantial implementation or before a pull request.
+- Handle trivial edits and sequential work in the primary thread; do not delegate for ceremony.
+- Keep the primary agent responsible for scope decisions, integration, fresh verification, and the final answer.
+
 (Yes, this file also applies to agents working on the ponytail repo itself. Especially to them.)
