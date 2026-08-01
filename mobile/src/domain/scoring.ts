@@ -15,7 +15,7 @@ function assertRating(rating: number) {
   }
 }
 
-function parseVisitedAt(value: string) {
+export function parseIsoDate(value: string) {
   const match = ISO_VISITED_AT.exec(value);
   if (!match) throw new Error('Visit timestamps must use a supported ISO format.');
 
@@ -38,7 +38,7 @@ function newestFirst(visits: ScoredVisit[]) {
   return visits
     .map((visit) => {
       assertRating(visit.score);
-      return { visit, visitedAt: parseVisitedAt(visit.visitedAt) };
+      return { visit, visitedAt: parseIsoDate(visit.visitedAt) };
     })
     .sort((left, right) => right.visitedAt - left.visitedAt)
     .map(({ visit }) => visit);
