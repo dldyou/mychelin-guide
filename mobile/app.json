@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "MYCHELIN Guide",
+    "slug": "mychelin-guide",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "mychelin",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true

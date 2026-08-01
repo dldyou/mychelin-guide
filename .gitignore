@@ -505,3 +505,6 @@ http-client.private.env.json
 
 # Codex planning documents
 /docs/superpowers/
+
+# Local Git worktrees
+/.worktrees/

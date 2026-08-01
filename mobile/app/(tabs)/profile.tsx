@@ -3,14 +3,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/src/components/Screen';
 import { colors } from '@/src/theme/colors';
 
-export default function HomeScreen() {
+export default function ProfileScreen() {
   return (
     <Screen>
       <View style={styles.intro}>
-        <Text style={styles.eyebrow}>MYCHELIN GUIDE</Text>
-        <Text style={styles.title}>홈</Text>
+        <Text style={styles.title}>프로필</Text>
         <Text style={styles.description}>
-          최근 방문과 자주 찾는 식당을 한눈에 확인할 수 있어요.
+          나의 기록 통계와 공유 기능을 확인할 예정이에요.
         </Text>
       </View>
     </Screen>
@@ -21,12 +20,6 @@ const styles = StyleSheet.create({
   intro: {
     gap: 12,
     paddingTop: 32,
-  },
-  eyebrow: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1.5,
   },
   title: {
     color: colors.ink,
