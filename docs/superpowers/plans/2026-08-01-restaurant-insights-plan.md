@@ -20,7 +20,7 @@
 - Home shows no more than three restaurants in each insight section.
 - Score-order ties and visit-count-order ties resolve by restaurant name ascending, then ID ascending.
 - Keep sort controls accessible and restaurant-card labels descriptive without relying on color.
-- Use TDD for non-trivial domain logic and leave the complete test suite green after every task.
+- Use strict RED-GREEN TDD for non-trivial domain logic. UI-only tasks are explicitly exempt from new component unit tests because the project has no component test dependency and this plan forbids adding dependencies; verify them with the existing suite, TypeScript, Expo export, and browser smoke checks instead. Leave the complete test suite green after every task.
 - Finish by pushing the feature branch and opening a Draft PR against `main` with a Title Case title; never merge locally.
 
 ---
@@ -105,18 +105,10 @@ expect(summary).not.toBeNull();
 expect(summary?.visitCount).toBe(2);
 expect(summary?.visits.map(({ visit }) => visit.id)).toEqual(['visit-new', 'visit-old']);
 expect(summary?.visits.map(({ score }) => score)).toEqual([5, 2]);
-expect(summary?.score).toBe(
-  calculateRestaurantScore(
-    [
-      { score: 5, visitedAt: '2026-08-01' },
-      { score: 2, visitedAt: '2026-07-01' },
-    ],
-    policy,
-  ),
-);
+expect(summary?.score).toBe(4);
 ```
 
-Use ratings whose taste/value and visit service/atmosphere values make the expected visit scores unambiguous. Do not reimplement the formula in the expectation; call the public scoring functions.
+Use ratings whose taste/value and visit service/atmosphere values make the expected visit scores unambiguous. Hand-check every expected score as a literal so the test cannot repeat an implementation error through the scoring helpers.
 
 - [ ] **Step 2: Run the focused test and confirm RED**
 
@@ -171,7 +163,7 @@ expect(summary?.menus).toEqual([
 - A rating pointing to a missing visit is ignored.
 - A visit with no valid ratings remains in history with `score: null` and does not affect the overall score.
 - Menu summaries sort by numeric score descending, then menu name and ID; unrated menus remain visible after rated menus.
-- Four scored visits expose the same recent-change value as `calculateRecentChange`.
+- Four scored visits expose a hand-calculated literal recent-change value.
 
 - [ ] **Step 6: Implement menu summaries and incomplete-link handling**
 
