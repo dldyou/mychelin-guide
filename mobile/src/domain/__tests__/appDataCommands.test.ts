@@ -244,6 +244,24 @@ describe('app data commands', () => {
     );
   });
 
+  it('trims a new-menu name without mutating the command', () => {
+    const command = commandWith({
+      newMenus: [
+        {
+          id: 'menu-new',
+          restaurantId: 'restaurant-1',
+          name: '  Dumplings  ',
+          createdAt: '2026-08-01',
+        },
+      ],
+    });
+
+    const next = appendVisit(createVisitData(), command);
+
+    expect(next.menus[next.menus.length - 1].name).toBe('Dumplings');
+    expect(command.newMenus[0].name).toBe('  Dumplings  ');
+  });
+
   it('appends a visit, a new menu, and ratings without mutating its inputs', () => {
     const data = createVisitData();
     const command = commandWith({

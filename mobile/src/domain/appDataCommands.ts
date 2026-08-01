@@ -73,9 +73,10 @@ const validateVisitCommand = (data: AppData, command: AppendVisitCommand) => {
 
 export const appendVisit = (data: AppData, command: AppendVisitCommand): AppData => {
   validateVisitCommand(data, command);
+  const newMenus = command.newMenus.map((menu) => ({ ...menu, name: menu.name.trim() }));
   return {
     ...data,
-    menus: [...data.menus, ...command.newMenus],
+    menus: [...data.menus, ...newMenus],
     visits: [...data.visits, command.visit],
     menuRatings: [...data.menuRatings, ...command.menuRatings],
   };
