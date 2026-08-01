@@ -18,6 +18,7 @@ import { loadAppData, saveAppData } from '../../storage/appStorage';
 import {
   AppDataProvider,
   type AppDataContextValue,
+  type NewVisitInput,
   useAppData,
 } from '../AppDataProvider';
 
@@ -177,6 +178,92 @@ describe('AppDataProvider', () => {
 
     expect(secondSavedData.restaurants).toEqual([first, second]);
     expect(current.data.restaurants).toEqual([first, second]);
+  });
+
+  test('snapshots mutation inputs before queued work runs', async () => {
+    let resolveLoad!: (data: AppData) => void;
+    mockedLoadAppData.mockReturnValue(new Promise((resolve) => {
+      resolveLoad = resolve;
+    }));
+    let savedData!: AppData;
+    mockedSaveAppData.mockImplementation(async (nextData) => {
+      savedData = nextData;
+    });
+    const loaded: AppData = {
+      ...createEmptyAppData(),
+      restaurants: [{
+        id: 'restaurant-loaded',
+        name: 'Loaded restaurant',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      }],
+      menus: [{
+        id: 'menu-loaded',
+        restaurantId: 'restaurant-loaded',
+        name: 'Loaded menu',
+        createdAt: '2026-08-01T00:00:00.000Z',
+      }],
+    };
+    const restaurantInput = { name: 'Call-time restaurant', category: 'Original category' };
+    const menuInput = { restaurantId: 'restaurant-loaded', name: 'Call-time menu' };
+    const photoUris = ['photo-original'];
+    const menuRatings = [
+      { menuId: 'menu-loaded', taste: 5, value: 4 },
+      { menuName: 'Call-time new menu', taste: 4, value: 3 },
+    ];
+    const visitInput: NewVisitInput = {
+      restaurantId: 'restaurant-loaded',
+      visitedAt: '2026-08-01T12:00:00.000Z',
+      daypart: 'lunch',
+      service: 5,
+      atmosphere: 4,
+      note: 'Original note',
+      photoUris,
+      menuRatings,
+    };
+    await renderProvider();
+
+    let restaurantMutation!: Promise<Restaurant>;
+    let menuMutation!: Promise<Menu>;
+    let visitMutation!: Promise<Visit>;
+    act(() => {
+      restaurantMutation = current.addRestaurant(restaurantInput);
+      menuMutation = current.addMenu(menuInput);
+      visitMutation = current.addVisit(visitInput);
+    });
+    restaurantInput.name = 'Mutated restaurant';
+    restaurantInput.category = 'Mutated category';
+    menuInput.name = 'Mutated menu';
+    visitInput.service = 1;
+    visitInput.note = 'Mutated note';
+    photoUris[0] = 'photo-mutated';
+    photoUris.push('photo-added');
+    menuRatings[0].taste = 1;
+    menuRatings[1].menuName = 'Mutated new menu';
+    menuRatings.push({ menuId: 'menu-loaded', taste: 1, value: 1 });
+
+    let restaurant!: Restaurant;
+    let menu!: Menu;
+    let visit!: Visit;
+    await act(async () => {
+      resolveLoad(loaded);
+      [restaurant, menu, visit] = await Promise.all([
+        restaurantMutation,
+        menuMutation,
+        visitMutation,
+      ]);
+    });
+
+    expect(restaurant).toMatchObject({ name: 'Call-time restaurant', category: 'Original category' });
+    expect(menu.name).toBe('Call-time menu');
+    expect(visit).toMatchObject({ service: 5, note: 'Original note', photoUris: ['photo-original'] });
+    expect(current.data.restaurants.find(({ id }) => id === restaurant.id)).toEqual(restaurant);
+    expect(current.data.menus.find(({ id }) => id === menu.id)).toEqual(menu);
+    expect(current.data.visits).toEqual([visit]);
+    expect(current.data.menuRatings).toHaveLength(2);
+    expect(current.data.menuRatings[0]).toMatchObject({ taste: 5, value: 4 });
+    expect(current.data.menus.find(({ id }) => id !== 'menu-loaded' && id !== menu.id)?.name)
+      .toBe('Call-time new menu');
+    expect(savedData).toEqual(current.data);
   });
 
   test('keeps restaurant state unchanged and exposes the error when persistence fails', async () => {

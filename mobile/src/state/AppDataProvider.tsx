@@ -102,61 +102,73 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
 
   const addRestaurant = (
     input: Pick<Restaurant, 'name' | 'category' | 'address'>,
-  ): Promise<Restaurant> => enqueueMutation((currentData) => {
-    const result: Restaurant = {
-      ...input,
-      id: createId('restaurant'),
-      createdAt: new Date().toISOString(),
-    };
-    return { nextData: appendRestaurant(currentData, result), result };
-  });
+  ): Promise<Restaurant> => {
+    const snapshot = { ...input };
+    return enqueueMutation((currentData) => {
+      const result: Restaurant = {
+        ...snapshot,
+        id: createId('restaurant'),
+        createdAt: new Date().toISOString(),
+      };
+      return { nextData: appendRestaurant(currentData, result), result };
+    });
+  };
 
-  const addMenu = (input: Pick<Menu, 'restaurantId' | 'name'>): Promise<Menu> =>
-    enqueueMutation((currentData) => {
+  const addMenu = (input: Pick<Menu, 'restaurantId' | 'name'>): Promise<Menu> => {
+    const snapshot = { ...input };
+    return enqueueMutation((currentData) => {
       const result: Menu = {
-        ...input,
+        ...snapshot,
         id: createId('menu'),
         createdAt: new Date().toISOString(),
       };
       return { nextData: appendMenu(currentData, result), result };
     });
+  };
 
-  const addVisit = (input: NewVisitInput): Promise<Visit> => enqueueMutation((currentData) => {
-    const createdAt = new Date().toISOString();
-    const result: Visit = {
-      id: createId('visit'),
-      restaurantId: input.restaurantId,
-      visitedAt: input.visitedAt ?? createdAt,
-      daypart: input.daypart,
-      service: input.service,
-      atmosphere: input.atmosphere,
-      note: input.note,
-      photoUris: input.photoUris ?? [],
+  const addVisit = (input: NewVisitInput): Promise<Visit> => {
+    const snapshot: NewVisitInput = {
+      ...input,
+      photoUris: input.photoUris ? [...input.photoUris] : undefined,
+      menuRatings: input.menuRatings.map((rating) => ({ ...rating })),
     };
-    const newMenus: Menu[] = [];
-    const menuRatings: MenuRating[] = input.menuRatings.map((inputRating) => {
-      let menuId = inputRating.menuId;
-      if (!menuId && inputRating.menuName !== undefined) {
-        const menu: Menu = {
-          id: createId('menu'),
-          restaurantId: input.restaurantId,
-          name: inputRating.menuName,
-          createdAt,
-        };
-        newMenus.push(menu);
-        menuId = menu.id;
-      }
-      return {
-        id: createId('rating'),
-        visitId: result.id,
-        menuId: menuId ?? '',
-        taste: inputRating.taste,
-        value: inputRating.value,
+    return enqueueMutation((currentData) => {
+      const createdAt = new Date().toISOString();
+      const result: Visit = {
+        id: createId('visit'),
+        restaurantId: snapshot.restaurantId,
+        visitedAt: snapshot.visitedAt ?? createdAt,
+        daypart: snapshot.daypart,
+        service: snapshot.service,
+        atmosphere: snapshot.atmosphere,
+        note: snapshot.note,
+        photoUris: snapshot.photoUris ?? [],
       };
+      const newMenus: Menu[] = [];
+      const menuRatings: MenuRating[] = snapshot.menuRatings.map((inputRating) => {
+        let menuId = inputRating.menuId;
+        if (!menuId && inputRating.menuName !== undefined) {
+          const menu: Menu = {
+            id: createId('menu'),
+            restaurantId: snapshot.restaurantId,
+            name: inputRating.menuName,
+            createdAt,
+          };
+          newMenus.push(menu);
+          menuId = menu.id;
+        }
+        return {
+          id: createId('rating'),
+          visitId: result.id,
+          menuId: menuId ?? '',
+          taste: inputRating.taste,
+          value: inputRating.value,
+        };
+      });
+      const nextData = appendVisit(currentData, { visit: result, newMenus, menuRatings });
+      return { nextData, result };
     });
-    const nextData = appendVisit(currentData, { visit: result, newMenus, menuRatings });
-    return { nextData, result };
-  });
+  };
 
   return (
     <AppDataContext.Provider value={{
