@@ -40,13 +40,11 @@ export default function HomeScreen() {
       >
         <Text style={styles.primaryActionText}>방문 기록하기</Text>
       </Pressable>
-      {isLoading ? <Text style={styles.statusMessage}>기록을 불러오는 중이에요.</Text> : null}
-      {error ? (
+      {isLoading ? <Text style={styles.statusMessage}>기록을 불러오는 중이에요.</Text> : error ? (
         <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>
           {error.message}
         </Text>
-      ) : null}
-      {!isLoading && !error ? (
+      ) : (
         <View style={styles.sections}>
           <View style={styles.section}>
             <Text style={styles.heading}>최근 방문</Text>
@@ -99,7 +97,7 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
-      ) : null}
+      )}
     </Screen>
   );
 }
