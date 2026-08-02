@@ -55,6 +55,7 @@ function RootLayoutNav() {
           <Stack.Screen name="restaurant/search" options={{ title: '식당 찾기' }} />
           <Stack.Screen name="restaurant/register" options={{ title: '식당 등록' }} />
           <Stack.Screen name="restaurant/[id]" options={{ title: '식당 상세' }} />
+          <Stack.Screen name="share/[id]" options={{ title: '공유 미리보기' }} />
           <Stack.Screen name="visit/new" options={{ title: '방문 기록' }} />
         </Stack>
       </ThemeProvider>

@@ -73,6 +73,16 @@ export default function RestaurantDetailScreen() {
           {summary.recentChange !== null ? (
             <Text style={styles.metric}>{`최근 변화 ${summary.recentChange > 0 ? '+' : ''}${summary.recentChange.toFixed(1)}`}</Text>
           ) : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push({
+              pathname: '/share/[id]',
+              params: { id: summary.restaurant.id },
+            })}
+            style={({ pressed }) => [styles.shareButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.shareButtonText}>공유 카드 만들기</Text>
+          </Pressable>
         </View>
 
         <View style={styles.section}>
@@ -171,6 +181,19 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: colors.accent,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  shareButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.accent,
+  },
+  shareButtonText: {
+    color: colors.background,
     fontSize: 16,
     fontWeight: '700',
   },
