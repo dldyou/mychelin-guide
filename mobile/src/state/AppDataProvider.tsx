@@ -25,6 +25,7 @@ import {
   updateVisit as updateVisitCommand,
 } from '../domain/appDataCommands';
 import { loadAppData, saveAppData } from '../storage/appStorage';
+import { copyPhotosToAppStorage, deleteAppOwnedPhotos } from '../storage/photoStorage';
 import { createId } from '../utils/createId';
 
 export type NewVisitInput = {
@@ -44,6 +45,7 @@ export type NewVisitInput = {
 };
 
 export type EditVisitInput = Pick<Visit, 'id' | 'visitedAt' | 'daypart' | 'service' | 'atmosphere' | 'note'> & {
+  photoUris?: string[];
   menuRatings: Array<Pick<MenuRating, 'id' | 'taste' | 'value'>>;
 };
 
@@ -112,17 +114,45 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
   };
 
   const enqueueMutation = <T,>(
-    build: (currentData: AppData) => { nextData: AppData; result: T },
+    build: (currentData: AppData) => Promise<{
+      nextData: AppData;
+      result: T;
+      cleanupOnFailure?(): Promise<void>;
+      afterPersist?(): Promise<void>;
+    }> | {
+      nextData: AppData;
+      result: T;
+      cleanupOnFailure?(): Promise<void>;
+      afterPersist?(): Promise<void>;
+    },
   ): Promise<T> => {
     const mutation = mutationQueue.current.then(async () => {
       await hydration.promise;
       if (hydrationErrorRef.current) throw hydrationErrorRef.current;
-      const { nextData, result } = build(dataRef.current);
-      await persist(nextData);
+      const { nextData, result, cleanupOnFailure, afterPersist } = await build(dataRef.current);
+      try {
+        await persist(nextData);
+      } catch (cause) {
+        try {
+          await cleanupOnFailure?.();
+        } catch {
+          // Keep the persistence failure as the actionable error.
+        }
+        throw cause;
+      }
+      await afterPersist?.();
       return result;
     });
     mutationQueue.current = mutation.then(() => undefined, () => undefined);
     return mutation;
+  };
+
+  const cleanupPersistedPhotos = async (uris: string[]) => {
+    try {
+      await deleteAppOwnedPhotos(uris);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause : new Error('Failed to remove visit photos.'));
+    }
   };
 
   const addRestaurant = (
@@ -157,7 +187,8 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
       photoUris: input.photoUris ? [...input.photoUris] : undefined,
       menuRatings: input.menuRatings.map((rating) => ({ ...rating })),
     };
-    return enqueueMutation((currentData) => {
+    return enqueueMutation(async (currentData) => {
+      const copiedPhotoUris = await copyPhotosToAppStorage(snapshot.photoUris ?? []);
       const createdAt = new Date().toISOString();
       const result: Visit = {
         id: createId('visit'),
@@ -167,7 +198,7 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
         service: snapshot.service,
         atmosphere: snapshot.atmosphere,
         note: snapshot.note,
-        photoUris: snapshot.photoUris ?? [],
+        photoUris: copiedPhotoUris,
       };
       const newMenus: Menu[] = [];
       const menuRatings: MenuRating[] = snapshot.menuRatings.map((inputRating) => {
@@ -190,8 +221,17 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
           value: inputRating.value,
         };
       });
-      const nextData = appendVisit(currentData, { visit: result, newMenus, menuRatings });
-      return { nextData, result };
+      try {
+        const nextData = appendVisit(currentData, { visit: result, newMenus, menuRatings });
+        return {
+          nextData,
+          result,
+          cleanupOnFailure: () => deleteAppOwnedPhotos(copiedPhotoUris),
+        };
+      } catch (cause) {
+        await cleanupPersistedPhotos(copiedPhotoUris);
+        throw cause;
+      }
     });
   };
 
@@ -210,6 +250,7 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
   const updateVisit = (input: EditVisitInput): Promise<Visit> => {
     const snapshot: EditVisitInput = {
       ...input,
+      photoUris: input.photoUris ? [...input.photoUris] : undefined,
       menuRatings: input.menuRatings.map((rating) => ({ ...rating })),
     };
     return enqueueMutation((currentData) => {
@@ -227,16 +268,25 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
         service: snapshot.service,
         atmosphere: snapshot.atmosphere,
         note: snapshot.note,
-        photoUris: [...currentVisit.photoUris],
+        photoUris: snapshot.photoUris ? [...snapshot.photoUris] : [...currentVisit.photoUris],
       };
-      return { nextData: updateVisitCommand(currentData, { visit: result, menuRatings }), result };
+      const removedPhotoUris = currentVisit.photoUris.filter((uri) => !result.photoUris.includes(uri));
+      return {
+        nextData: updateVisitCommand(currentData, { visit: result, menuRatings }),
+        result,
+        afterPersist: () => cleanupPersistedPhotos(removedPhotoUris),
+      };
     });
   };
 
-  const deleteVisit = (id: string): Promise<void> => enqueueMutation((currentData) => ({
-    nextData: deleteVisitCommand(currentData, id),
-    result: undefined,
-  }));
+  const deleteVisit = (id: string): Promise<void> => enqueueMutation((currentData) => {
+    const currentVisit = currentData.visits.find((visit) => visit.id === id);
+    return {
+      nextData: deleteVisitCommand(currentData, id),
+      result: undefined,
+      afterPersist: () => cleanupPersistedPhotos(currentVisit?.photoUris ?? []),
+    };
+  });
 
   const deleteRestaurant = (id: string): Promise<void> => enqueueMutation((currentData) => ({
     nextData: deleteRestaurantCommand(currentData, id),

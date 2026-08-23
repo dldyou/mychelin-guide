@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { RatingRow } from '@/src/components/RatingRow';
 import { Screen } from '@/src/components/Screen';
+import { VisitPhotos } from '@/src/components/VisitPhotos';
 import { type NewVisitInput, useAppData } from '@/src/state/AppDataProvider';
 import { colors } from '@/src/theme/colors';
 import { createId } from '@/src/utils/createId';
@@ -321,7 +322,13 @@ export default function NewVisitScreen() {
             <Text style={styles.secondaryButtonText}>사진 추가</Text>
           </Pressable>
           {photoUris.length > 0 ? (
-            <Text accessibilityLiveRegion="polite" style={styles.message}>사진 {photoUris.length}장 선택됨</Text>
+            <>
+              <Text accessibilityLiveRegion="polite" style={styles.message}>사진 {photoUris.length}장 선택됨</Text>
+              <VisitPhotos
+                onRemove={(uri) => setPhotoUris((current) => current.filter((photoUri) => photoUri !== uri))}
+                photoUris={photoUris}
+              />
+            </>
           ) : null}
         </View>
 

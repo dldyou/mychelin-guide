@@ -4,6 +4,7 @@ import { Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'r
 
 import { RatingRow } from '@/src/components/RatingRow';
 import { Screen } from '@/src/components/Screen';
+import { VisitPhotos } from '@/src/components/VisitPhotos';
 import type { Restaurant } from '@/src/domain/appData';
 import { getRestaurantSummary } from '@/src/domain/restaurantSummary';
 import type { VisitSummary } from '@/src/domain/restaurantSummary';
@@ -198,6 +199,7 @@ export default function RestaurantDetailScreen() {
               <Text style={styles.detail}>{`서비스 ${visitSummary.visit.service}점 · 분위기 ${visitSummary.visit.atmosphere}점`}</Text>
               <Text style={styles.detail}>{`평가 ${visitSummary.score === null ? '평가 전' : visitSummary.score.toFixed(1)}`}</Text>
               {visitSummary.visit.note?.trim() ? <Text style={styles.note}>{visitSummary.visit.note.trim()}</Text> : null}
+              <VisitPhotos photoUris={visitSummary.visit.photoUris} />
               <Pressable
                 accessibilityLabel={`${visitSummary.visit.visitedAt} 방문 기록 수정`}
                 accessibilityRole="button"
@@ -268,6 +270,7 @@ function VisitEditor({ visitSummary, onCancel }: { visitSummary: VisitSummary; o
   const [service, setService] = useState(visit.service);
   const [atmosphere, setAtmosphere] = useState(visit.atmosphere);
   const [note, setNote] = useState(visit.note ?? '');
+  const [photoUris, setPhotoUris] = useState(() => [...visit.photoUris]);
   const [ratings, setRatings] = useState(() => visitSummary.menuRatings.map(({ rating, menu }) => ({
     ...rating,
     menuName: menu.name,
@@ -291,6 +294,7 @@ function VisitEditor({ visitSummary, onCancel }: { visitSummary: VisitSummary; o
         service,
         atmosphere,
         note: note.trim() || undefined,
+        photoUris,
         menuRatings: ratings.map(({ id, taste, value }) => ({ id, taste, value })),
       });
       onCancel();
@@ -340,6 +344,10 @@ function VisitEditor({ visitSummary, onCancel }: { visitSummary: VisitSummary; o
         </View>
       ))}
       <TextInput accessibilityLabel="방문 메모 입력" multiline onChangeText={setNote} placeholder="메모" placeholderTextColor={colors.muted} style={[styles.input, styles.noteInput]} value={note} />
+      <VisitPhotos
+        onRemove={(uri) => setPhotoUris((current) => current.filter((photoUri) => photoUri !== uri))}
+        photoUris={photoUris}
+      />
       {formError ? <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>{formError}</Text> : null}
       <View style={styles.actionRow}>
         <Pressable accessibilityRole="button" onPress={onCancel} style={({ pressed }) => [styles.secondaryButton, styles.flexButton, pressed && styles.buttonPressed]}>
