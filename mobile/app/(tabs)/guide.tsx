@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { RestaurantCard } from '@/src/components/RestaurantCard';
 import { Screen } from '@/src/components/Screen';
 import {
   type RestaurantSummarySort,
+  type RestaurantStatusFilter,
+  filterRestaurantSummaries,
   getRestaurantSummaries,
   sortRestaurantSummaries,
 } from '@/src/domain/restaurantSummary';
@@ -16,14 +18,25 @@ import { colors } from '@/src/theme/colors';
 export default function GuideScreen() {
   const router = useRouter();
   const [sort, setSort] = useState<RestaurantSummarySort>('score');
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState<RestaurantStatusFilter>('all');
   const [focusedSort, setFocusedSort] = useState<RestaurantSummarySort | null>(null);
   const { data, isLoading, error } = useAppData();
+  const allSummaries = getRestaurantSummaries(data, DEFAULT_SCORE_POLICY);
   const summaries = sortRestaurantSummaries(
-    getRestaurantSummaries(data, DEFAULT_SCORE_POLICY),
+    filterRestaurantSummaries(allSummaries, { query, category, status }),
     sort,
   );
+  const hasActiveFilters = query.trim() !== '' || category.trim() !== '' || status !== 'all';
   const wantToVisit = summaries.filter(({ visitCount }) => visitCount === 0);
   const visited = summaries.filter(({ visitCount }) => visitCount > 0);
+
+  const clearFilters = () => {
+    setQuery('');
+    setCategory('');
+    setStatus('all');
+  };
 
   return (
     <Screen>
@@ -59,6 +72,48 @@ export default function GuideScreen() {
           );
         })}
       </View>
+      <View style={styles.filters}>
+        <TextInput
+          accessibilityLabel="식당 이름 검색"
+          placeholder="식당 이름 검색"
+          placeholderTextColor={colors.muted}
+          style={styles.textFilter}
+          value={query}
+          onChangeText={setQuery}
+        />
+        <TextInput
+          accessibilityLabel="카테고리 필터"
+          placeholder="카테고리 필터"
+          placeholderTextColor={colors.muted}
+          style={styles.textFilter}
+          value={category}
+          onChangeText={setCategory}
+        />
+        <View accessibilityLabel="방문 상태" accessibilityRole="radiogroup" style={styles.statusControls}>
+          {([
+            ['all', '전체'],
+            ['want-to-visit', '가보고 싶은 곳'],
+            ['visited', '방문한 곳'],
+          ] as const).map(([option, label]) => (
+            <Pressable
+              key={option}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: status === option }}
+              onPress={() => setStatus(option)}
+              style={[styles.statusControl, status === option && styles.statusControlSelected]}
+            >
+              <Text style={[styles.statusControlText, status === option && styles.statusControlTextSelected]}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {hasActiveFilters ? (
+          <Pressable accessibilityRole="button" onPress={clearFilters} style={styles.clearFilters}>
+            <Text style={styles.clearFiltersText}>필터 초기화</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <View style={styles.results}>
         {isLoading ? <Text style={styles.message}>식당 정보를 불러오는 중이에요.</Text> : null}
         {!isLoading && error ? (
@@ -66,8 +121,11 @@ export default function GuideScreen() {
             {error.message}
           </Text>
         ) : null}
-        {!isLoading && !error && summaries.length === 0 ? (
+        {!isLoading && !error && allSummaries.length === 0 ? (
           <Text style={styles.message}>아직 등록된 식당이 없어요.</Text>
+        ) : null}
+        {!isLoading && !error && allSummaries.length > 0 && summaries.length === 0 ? (
+          <Text style={styles.message}>조건에 맞는 식당이 없어요.</Text>
         ) : null}
         {!isLoading && !error && wantToVisit.length > 0 ? (
           <GuideSection heading="가보고 싶은 곳" summaries={wantToVisit} onPress={(id) => router.push({
@@ -157,6 +215,54 @@ const styles = StyleSheet.create({
   },
   sortControlTextSelected: {
     color: colors.accent,
+  },
+  filters: {
+    gap: 8,
+    marginTop: 16,
+  },
+  textFilter: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    color: colors.ink,
+    fontSize: 16,
+    paddingHorizontal: 12,
+  },
+  statusControls: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusControl: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+  },
+  statusControlSelected: {
+    borderColor: colors.accent,
+  },
+  statusControlText: {
+    color: colors.muted,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  statusControlTextSelected: {
+    color: colors.accent,
+  },
+  clearFilters: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  clearFiltersText: {
+    color: colors.accent,
+    fontSize: 16,
+    fontWeight: '700',
   },
   results: {
     gap: 12,

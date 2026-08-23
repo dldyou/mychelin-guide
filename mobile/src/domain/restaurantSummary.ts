@@ -36,6 +36,7 @@ export type RestaurantSummary = {
 };
 
 export type RestaurantSummarySort = 'score' | 'visits';
+export type RestaurantStatusFilter = 'all' | 'want-to-visit' | 'visited';
 
 export function getRestaurantSummary(
   restaurantId: string,
@@ -150,6 +151,20 @@ export function sortRestaurantSummaries(
 
     return right.visitCount - left.visitCount || compareRestaurantIdentity(left, right);
   });
+}
+
+export function filterRestaurantSummaries(
+  summaries: RestaurantSummary[],
+  { query, category, status }: { query: string; category: string; status: RestaurantStatusFilter },
+): RestaurantSummary[] {
+  const nameNeedle = query.trim().toLocaleLowerCase();
+  const categoryNeedle = category.trim().toLocaleLowerCase();
+
+  return summaries.filter((summary) =>
+    summary.restaurant.name.toLocaleLowerCase().includes(nameNeedle)
+    && (summary.restaurant.category ?? '').toLocaleLowerCase().includes(categoryNeedle)
+    && (status === 'all' || (status === 'visited' ? summary.visitCount > 0 : summary.visitCount === 0)),
+  );
 }
 
 export function getRecentRestaurantSummaries(

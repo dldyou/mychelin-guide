@@ -1,5 +1,6 @@
 import { DEFAULT_SCORE_POLICY } from '../scorePolicy';
 import {
+  filterRestaurantSummaries,
   getRecentRestaurantSummaries,
   getRestaurantSummaries,
   getRestaurantSummary,
@@ -279,6 +280,28 @@ describe('restaurant summary collections', () => {
       'frequent',
       'same-count-a',
     ]);
+  });
+
+  it('filters names and categories case-insensitively while separating saved and visited restaurants', () => {
+    const saved = summary('saved', '  Seoul Cafe  ', null, 0);
+    const visited = summary('visited', 'Noodle House', 4, 1);
+    saved.restaurant.category = 'Dessert';
+    visited.restaurant.category = 'Korean';
+    const summaries = [saved, visited];
+
+    expect(restaurantIds(filterRestaurantSummaries(summaries, {
+      query: ' cafe ', category: ' DESSERT ', status: 'all',
+    }))).toEqual(['saved']);
+    expect(restaurantIds(filterRestaurantSummaries(summaries, {
+      query: '', category: '', status: 'want-to-visit',
+    }))).toEqual(['saved']);
+    expect(restaurantIds(filterRestaurantSummaries(summaries, {
+      query: '', category: '', status: 'visited',
+    }))).toEqual(['visited']);
+    expect(restaurantIds(sortRestaurantSummaries(filterRestaurantSummaries(summaries, {
+      query: '', category: '', status: 'all',
+    }), 'score'))).toEqual(['visited', 'saved']);
+    expect(restaurantIds(summaries)).toEqual(['saved', 'visited']);
   });
 
   it('returns the newest visited restaurants by ISO instant without mutating input', () => {
