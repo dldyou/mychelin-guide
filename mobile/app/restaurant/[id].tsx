@@ -73,6 +73,18 @@ export default function RestaurantDetailScreen() {
           {summary.recentChange !== null ? (
             <Text style={styles.metric}>{`최근 변화 ${summary.recentChange > 0 ? '+' : ''}${summary.recentChange.toFixed(1)}`}</Text>
           ) : null}
+          {summary.visitCount === 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push({
+                pathname: '/visit/new',
+                params: { restaurantId: summary.restaurant.id },
+              })}
+              style={({ pressed }) => [styles.shareButton, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.shareButtonText}>방문 기록하기</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push({

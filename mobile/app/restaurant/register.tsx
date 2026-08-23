@@ -16,7 +16,7 @@ export default function RestaurantRegisterScreen() {
   const [formError, setFormError] = useState<string | null>(null);
   const canSave = name.trim().length > 0 && !isSaving;
 
-  const submit = async () => {
+  const submit = async (recordVisit: boolean) => {
     if (!canSave) return;
 
     setIsSaving(true);
@@ -27,10 +27,9 @@ export default function RestaurantRegisterScreen() {
         category: category.trim() || undefined,
         address: address.trim() || undefined,
       });
-      router.replace({
-        pathname: '/visit/new',
-        params: { restaurantId: restaurant.id },
-      });
+      router.replace(recordVisit
+        ? { pathname: '/visit/new', params: { restaurantId: restaurant.id } }
+        : { pathname: '/restaurant/[id]', params: { id: restaurant.id } });
     } catch (cause) {
       setFormError(cause instanceof Error ? cause.message : '식당을 저장하지 못했습니다.');
     } finally {
@@ -85,14 +84,27 @@ export default function RestaurantRegisterScreen() {
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSave }}
           disabled={!canSave}
-          onPress={submit}
+          onPress={() => submit(true)}
           style={({ pressed }) => [
             styles.submitButton,
             !canSave && styles.buttonDisabled,
             pressed && canSave && styles.buttonPressed,
           ]}
         >
-          <Text style={styles.submitButtonText}>{isSaving ? '저장 중...' : '식당 등록하기'}</Text>
+          <Text style={styles.submitButtonText}>{isSaving ? '저장 중...' : '등록 후 방문 기록하기'}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canSave }}
+          disabled={!canSave}
+          onPress={() => submit(false)}
+          style={({ pressed }) => [
+            styles.laterButton,
+            !canSave && styles.buttonDisabled,
+            pressed && canSave && styles.buttonPressed,
+          ]}
+        >
+          <Text style={styles.laterButtonText}>가보고 싶은 곳에 저장</Text>
         </Pressable>
       </View>
     </Screen>
@@ -136,6 +148,21 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     color: colors.background,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  laterButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+  },
+  laterButtonText: {
+    color: colors.accent,
     fontSize: 16,
     fontWeight: '700',
   },
