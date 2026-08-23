@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { RatingRow } from '@/src/components/RatingRow';
 import { Screen } from '@/src/components/Screen';
+import { localDateInputValue } from '@/src/domain/visitDate';
 import { type NewVisitInput, useAppData } from '@/src/state/AppDataProvider';
 import { colors } from '@/src/theme/colors';
 import { createId } from '@/src/utils/createId';
@@ -33,6 +34,7 @@ export default function NewVisitScreen() {
   const { data, isLoading, error, addVisit } = useAppData();
   const restaurant = data.restaurants.find(({ id }) => id === restaurantId);
   const menus = data.menus.filter((menu) => menu.restaurantId === restaurantId);
+  const [visitedOn, setVisitedOn] = useState(localDateInputValue);
   const [daypart, setDaypart] = useState<Daypart | null>(null);
   const [service, setService] = useState<number | null>(null);
   const [atmosphere, setAtmosphere] = useState<number | null>(null);
@@ -44,6 +46,7 @@ export default function NewVisitScreen() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const canSave = Boolean(restaurantId)
+    && Boolean(visitedOn.trim())
     && service !== null
     && atmosphere !== null
     && drafts.length > 0
@@ -102,7 +105,7 @@ export default function NewVisitScreen() {
     try {
       await addVisit({
         restaurantId,
-        visitedAt: new Date().toISOString(),
+        visitedAt: visitedOn.trim(),
         daypart: daypart ?? undefined,
         service: service!,
         atmosphere: atmosphere!,
@@ -160,6 +163,19 @@ export default function NewVisitScreen() {
         <View style={styles.section}>
           <Text style={styles.title}>{restaurant.name}</Text>
           <Text style={styles.message}>이번 방문을 기록해 보세요.</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>방문 날짜</Text>
+          <TextInput
+            accessibilityLabel="방문 날짜 입력"
+            autoCapitalize="none"
+            onChangeText={setVisitedOn}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={colors.muted}
+            style={styles.input}
+            value={visitedOn}
+          />
         </View>
 
         <View accessibilityLabel="방문 시간대" accessibilityRole="radiogroup" style={styles.section}>
