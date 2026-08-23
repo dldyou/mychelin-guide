@@ -18,6 +18,7 @@ import { loadAppData, saveAppData } from '../../storage/appStorage';
 import {
   AppDataProvider,
   type AppDataContextValue,
+  type EditVisitInput,
   type NewVisitInput,
   useAppData,
 } from '../AppDataProvider';
@@ -399,5 +400,66 @@ describe('AppDataProvider', () => {
       service: 5,
       photoUris: ['file:///meal.jpg'],
     });
+  });
+
+  test('edits and deletes records through the persistence queue', async () => {
+    const loaded: AppData = {
+      restaurants: [
+        { id: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z' },
+        { id: 'restaurant-2', name: 'Cafe', createdAt: '2026-08-01T00:00:00.000Z' },
+      ],
+      menus: [
+        { id: 'menu-1', restaurantId: 'restaurant-1', name: 'Cold soba', createdAt: '2026-08-01T00:00:00.000Z' },
+        { id: 'menu-2', restaurantId: 'restaurant-2', name: 'Coffee', createdAt: '2026-08-01T00:00:00.000Z' },
+      ],
+      visits: [{
+        id: 'visit-1', restaurantId: 'restaurant-1', visitedAt: '2026-08-20T12:00:00.000Z',
+        service: 3, atmosphere: 4, photoUris: [],
+      }],
+      menuRatings: [{ id: 'rating-1', visitId: 'visit-1', menuId: 'menu-1', taste: 3, value: 4 }],
+    };
+    mockedLoadAppData.mockResolvedValue(loaded);
+    mockedSaveAppData.mockResolvedValue();
+    await renderProvider();
+
+    const visitInput: EditVisitInput = {
+      id: 'visit-1',
+      visitedAt: '2026-08-21T18:00:00.000Z',
+      daypart: 'dinner',
+      service: 5,
+      atmosphere: 5,
+      note: 'Better',
+      menuRatings: [{ id: 'rating-1', taste: 5, value: 5 }],
+    };
+    await act(async () => {
+      await current.updateRestaurant('restaurant-1', { name: 'New Soba', category: 'Japanese' });
+      await current.updateVisit(visitInput);
+      await current.deleteVisit('visit-1');
+      await current.deleteRestaurant('restaurant-1');
+    });
+
+    expect(current.data.restaurants.map(({ id }) => id)).toEqual(['restaurant-2']);
+    expect(current.data.menus.map(({ id }) => id)).toEqual(['menu-2']);
+    expect(current.data.visits).toEqual([]);
+    expect(current.data.menuRatings).toEqual([]);
+    expect(mockedSaveAppData).toHaveBeenCalledTimes(4);
+  });
+
+  test('does not publish an edit or deletion when persistence fails', async () => {
+    const loaded: AppData = {
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z' }],
+    };
+    mockedLoadAppData.mockResolvedValue(loaded);
+    mockedSaveAppData.mockRejectedValue(new Error('disk full'));
+    await renderProvider();
+
+    await act(async () => {
+      await expect(current.updateRestaurant('restaurant-1', { name: 'Changed' }))
+        .rejects.toThrow('disk full');
+      await expect(current.deleteRestaurant('restaurant-1')).rejects.toThrow('disk full');
+    });
+
+    expect(current.data).toEqual(loaded);
   });
 });

@@ -15,7 +15,15 @@ import {
   type Restaurant,
   type Visit,
 } from '../domain/appData';
-import { appendMenu, appendRestaurant, appendVisit } from '../domain/appDataCommands';
+import {
+  appendMenu,
+  appendRestaurant,
+  appendVisit,
+  deleteRestaurant as deleteRestaurantCommand,
+  deleteVisit as deleteVisitCommand,
+  updateRestaurant as updateRestaurantCommand,
+  updateVisit as updateVisitCommand,
+} from '../domain/appDataCommands';
 import { loadAppData, saveAppData } from '../storage/appStorage';
 import { createId } from '../utils/createId';
 
@@ -35,6 +43,10 @@ export type NewVisitInput = {
   }>;
 };
 
+export type EditVisitInput = Pick<Visit, 'id' | 'visitedAt' | 'daypart' | 'service' | 'atmosphere' | 'note'> & {
+  menuRatings: Array<Pick<MenuRating, 'id' | 'taste' | 'value'>>;
+};
+
 export type AppDataContextValue = {
   data: AppData;
   isLoading: boolean;
@@ -42,6 +54,13 @@ export type AppDataContextValue = {
   addRestaurant(input: Pick<Restaurant, 'name' | 'category' | 'address'>): Promise<Restaurant>;
   addMenu(input: Pick<Menu, 'restaurantId' | 'name'>): Promise<Menu>;
   addVisit(input: NewVisitInput): Promise<Visit>;
+  updateRestaurant(
+    id: string,
+    input: Pick<Restaurant, 'name' | 'category' | 'address'>,
+  ): Promise<Restaurant>;
+  updateVisit(input: EditVisitInput): Promise<Visit>;
+  deleteVisit(id: string): Promise<void>;
+  deleteRestaurant(id: string): Promise<void>;
 };
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -176,6 +195,54 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
     });
   };
 
+  const updateRestaurant = (
+    id: string,
+    input: Pick<Restaurant, 'name' | 'category' | 'address'>,
+  ): Promise<Restaurant> => {
+    const snapshot = { id, ...input };
+    return enqueueMutation((currentData) => {
+      const nextData = updateRestaurantCommand(currentData, snapshot);
+      const result = { ...nextData.restaurants.find((restaurant) => restaurant.id === id)! };
+      return { nextData, result };
+    });
+  };
+
+  const updateVisit = (input: EditVisitInput): Promise<Visit> => {
+    const snapshot: EditVisitInput = {
+      ...input,
+      menuRatings: input.menuRatings.map((rating) => ({ ...rating })),
+    };
+    return enqueueMutation((currentData) => {
+      const currentVisit = currentData.visits.find(({ id }) => id === snapshot.id);
+      if (!currentVisit) throw new Error('Visit does not exist.');
+      const menuRatings = snapshot.menuRatings.map((rating) => {
+        const currentRating = currentData.menuRatings.find(({ id }) => id === rating.id);
+        if (!currentRating) throw new Error('Menu rating does not belong to the visit.');
+        return { ...currentRating, ...rating };
+      });
+      const result: Visit = {
+        ...currentVisit,
+        visitedAt: snapshot.visitedAt,
+        daypart: snapshot.daypart,
+        service: snapshot.service,
+        atmosphere: snapshot.atmosphere,
+        note: snapshot.note,
+        photoUris: [...currentVisit.photoUris],
+      };
+      return { nextData: updateVisitCommand(currentData, { visit: result, menuRatings }), result };
+    });
+  };
+
+  const deleteVisit = (id: string): Promise<void> => enqueueMutation((currentData) => ({
+    nextData: deleteVisitCommand(currentData, id),
+    result: undefined,
+  }));
+
+  const deleteRestaurant = (id: string): Promise<void> => enqueueMutation((currentData) => ({
+    nextData: deleteRestaurantCommand(currentData, id),
+    result: undefined,
+  }));
+
   return (
     <AppDataContext.Provider value={{
       data,
@@ -184,6 +251,10 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
       addRestaurant,
       addMenu,
       addVisit,
+      updateRestaurant,
+      updateVisit,
+      deleteVisit,
+      deleteRestaurant,
     }}>
       {children}
     </AppDataContext.Provider>
