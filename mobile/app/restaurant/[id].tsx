@@ -8,6 +8,7 @@ import type { Restaurant } from '@/src/domain/appData';
 import { getRestaurantSummary } from '@/src/domain/restaurantSummary';
 import type { VisitSummary } from '@/src/domain/restaurantSummary';
 import { DEFAULT_SCORE_POLICY } from '@/src/domain/scorePolicy';
+import { formatVisitDate, replaceVisitDate, visitDateInputValue } from '@/src/domain/visitDate';
 import { useAppData } from '@/src/state/AppDataProvider';
 import { colors } from '@/src/theme/colors';
 
@@ -193,13 +194,13 @@ export default function RestaurantDetailScreen() {
             />
           ) : (
             <View key={visitSummary.visit.id} style={styles.card}>
-              <Text style={styles.label}>{visitSummary.visit.visitedAt}</Text>
+              <Text style={styles.label}>{formatVisitDate(visitSummary.visit.visitedAt)}</Text>
               {visitSummary.visit.daypart ? <Text style={styles.detail}>{daypartLabels[visitSummary.visit.daypart]}</Text> : null}
               <Text style={styles.detail}>{`서비스 ${visitSummary.visit.service}점 · 분위기 ${visitSummary.visit.atmosphere}점`}</Text>
               <Text style={styles.detail}>{`평가 ${visitSummary.score === null ? '평가 전' : visitSummary.score.toFixed(1)}`}</Text>
               {visitSummary.visit.note?.trim() ? <Text style={styles.note}>{visitSummary.visit.note.trim()}</Text> : null}
               <Pressable
-                accessibilityLabel={`${visitSummary.visit.visitedAt} 방문 기록 수정`}
+                accessibilityLabel={`${formatVisitDate(visitSummary.visit.visitedAt)} 방문 기록 수정`}
                 accessibilityRole="button"
                 onPress={() => setEditingVisitId(visitSummary.visit.id)}
                 style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
@@ -263,7 +264,7 @@ function RestaurantEditor({ restaurant, onCancel }: { restaurant: Restaurant; on
 function VisitEditor({ visitSummary, onCancel }: { visitSummary: VisitSummary; onCancel(): void }) {
   const { updateVisit, deleteVisit } = useAppData();
   const { visit } = visitSummary;
-  const [visitedAt, setVisitedAt] = useState(visit.visitedAt);
+  const [visitedOn, setVisitedOn] = useState(() => visitDateInputValue(visit.visitedAt));
   const [daypart, setDaypart] = useState<Daypart | undefined>(visit.daypart);
   const [service, setService] = useState(visit.service);
   const [atmosphere, setAtmosphere] = useState(visit.atmosphere);
@@ -274,7 +275,7 @@ function VisitEditor({ visitSummary, onCancel }: { visitSummary: VisitSummary; o
   })));
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const canSave = Boolean(visitedAt.trim()) && !isSaving;
+  const canSave = Boolean(visitedOn.trim()) && !isSaving;
   const updateRating = (id: string, change: { taste?: number; value?: number }) => {
     setRatings((current) => current.map((rating) => rating.id === id ? { ...rating, ...change } : rating));
   };
@@ -286,7 +287,7 @@ function VisitEditor({ visitSummary, onCancel }: { visitSummary: VisitSummary; o
     try {
       await updateVisit({
         id: visit.id,
-        visitedAt: visitedAt.trim(),
+        visitedAt: replaceVisitDate(visit.visitedAt, visitedOn.trim()),
         daypart,
         service,
         atmosphere,
@@ -303,7 +304,7 @@ function VisitEditor({ visitSummary, onCancel }: { visitSummary: VisitSummary; o
 
   const confirmDelete = () => confirmDestructiveAction(
     '방문 기록 삭제',
-    `${visit.visitedAt} 방문 기록과 메뉴 평가를 삭제할까요?`,
+    `${formatVisitDate(visit.visitedAt)} 방문 기록과 메뉴 평가를 삭제할까요?`,
     () => {
       setIsSaving(true);
       setFormError(null);
@@ -319,7 +320,7 @@ function VisitEditor({ visitSummary, onCancel }: { visitSummary: VisitSummary; o
     <View accessibilityLabel="방문 기록 수정" style={styles.card}>
       <Text style={styles.heading}>방문 기록 수정</Text>
       <Text style={styles.label}>방문 날짜</Text>
-      <TextInput accessibilityLabel="방문 날짜 입력" autoCapitalize="none" onChangeText={setVisitedAt} style={styles.input} value={visitedAt} />
+      <TextInput accessibilityLabel="방문 날짜 입력" autoCapitalize="none" onChangeText={setVisitedOn} placeholder="YYYY-MM-DD" placeholderTextColor={colors.muted} style={styles.input} value={visitedOn} />
       <View accessibilityLabel="방문 시간대" accessibilityRole="radiogroup" style={styles.choiceRow}>
         {daypartOptions.map((option) => {
           const selected = daypart === option.value;
