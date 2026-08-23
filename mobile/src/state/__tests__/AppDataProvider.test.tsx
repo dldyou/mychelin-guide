@@ -15,6 +15,7 @@ import {
   type Visit,
 } from '../../domain/appData';
 import { loadAppData, saveAppData } from '../../storage/appStorage';
+import { copyPhotosToAppStorage, deleteAppOwnedPhotos } from '../../storage/photoStorage';
 import {
   AppDataProvider,
   type AppDataContextValue,
@@ -28,8 +29,15 @@ jest.mock('../../storage/appStorage', () => ({
   saveAppData: jest.fn(),
 }));
 
+jest.mock('../../storage/photoStorage', () => ({
+  copyPhotosToAppStorage: jest.fn(),
+  deleteAppOwnedPhotos: jest.fn(),
+}));
+
 const mockedLoadAppData = jest.mocked(loadAppData);
 const mockedSaveAppData = jest.mocked(saveAppData);
+const mockedCopyPhotos = jest.mocked(copyPhotosToAppStorage);
+const mockedDeletePhotos = jest.mocked(deleteAppOwnedPhotos);
 
 describe('AppDataProvider', () => {
   let container: HTMLDivElement;
@@ -49,6 +57,8 @@ describe('AppDataProvider', () => {
 
   beforeEach(() => {
     mockedLoadAppData.mockResolvedValue(createEmptyAppData());
+    mockedCopyPhotos.mockImplementation(async (uris) => [...uris]);
+    mockedDeletePhotos.mockResolvedValue();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -400,6 +410,141 @@ describe('AppDataProvider', () => {
       service: 5,
       photoUris: ['file:///meal.jpg'],
     });
+  });
+
+  test('publishes app-owned photo URIs instead of picker URIs', async () => {
+    mockedLoadAppData.mockResolvedValue({
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z' }],
+      menus: [{
+        id: 'menu-1', restaurantId: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z',
+      }],
+    });
+    mockedCopyPhotos.mockResolvedValue(['file:///documents/visit-photos/photo.jpg']);
+    mockedSaveAppData.mockResolvedValue();
+    await renderProvider();
+
+    await act(async () => {
+      await current.addVisit({
+        restaurantId: 'restaurant-1',
+        service: 5,
+        atmosphere: 4,
+        photoUris: ['file:///picker/photo.jpg'],
+        menuRatings: [{ menuId: 'menu-1', taste: 5, value: 4 }],
+      });
+    });
+
+    expect(current.data.visits[0].photoUris)
+      .toEqual(['file:///documents/visit-photos/photo.jpg']);
+  });
+
+  test('does not save or publish a visit when photo copying fails', async () => {
+    mockedCopyPhotos.mockRejectedValue(new Error('copy failed'));
+    await renderProvider();
+
+    await act(async () => {
+      await expect(current.addVisit({
+        restaurantId: 'missing',
+        service: 5,
+        atmosphere: 4,
+        photoUris: ['file:///picker/photo.jpg'],
+        menuRatings: [{ menuName: 'Soba', taste: 5, value: 4 }],
+      })).rejects.toThrow('copy failed');
+    });
+
+    expect(mockedSaveAppData).not.toHaveBeenCalled();
+    expect(current.data).toEqual(createEmptyAppData());
+  });
+
+  test('removes newly copied photos when visit persistence fails', async () => {
+    mockedLoadAppData.mockResolvedValue({
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z' }],
+      menus: [{
+        id: 'menu-1', restaurantId: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z',
+      }],
+    });
+    mockedCopyPhotos.mockResolvedValue(['file:///documents/visit-photos/photo.jpg']);
+    mockedSaveAppData.mockRejectedValue(new Error('disk full'));
+    await renderProvider();
+
+    await act(async () => {
+      await expect(current.addVisit({
+        restaurantId: 'restaurant-1',
+        service: 5,
+        atmosphere: 4,
+        photoUris: ['file:///picker/photo.jpg'],
+        menuRatings: [{ menuId: 'menu-1', taste: 5, value: 4 }],
+      })).rejects.toThrow('disk full');
+    });
+
+    expect(mockedCopyPhotos).toHaveBeenCalledWith(['file:///picker/photo.jpg']);
+    expect(mockedDeletePhotos).toHaveBeenCalledWith(['file:///documents/visit-photos/photo.jpg']);
+    expect(current.data.visits).toEqual([]);
+  });
+
+  test('deletes persisted visit photos only after the record deletion is saved', async () => {
+    let resolveSave!: () => void;
+    const loaded: AppData = {
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z' }],
+      visits: [{
+        id: 'visit-1', restaurantId: 'restaurant-1', visitedAt: '2026-08-20T12:00:00.000Z',
+        service: 3, atmosphere: 4, photoUris: ['file:///documents/visit-photos/photo.jpg'],
+      }],
+    };
+    mockedLoadAppData.mockResolvedValue(loaded);
+    mockedSaveAppData.mockReturnValue(new Promise((resolve) => {
+      resolveSave = resolve;
+    }));
+    await renderProvider();
+
+    let deletion!: Promise<void>;
+    act(() => {
+      deletion = current.deleteVisit('visit-1');
+    });
+    await act(async () => Promise.resolve());
+    expect(mockedDeletePhotos).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSave();
+      await deletion;
+    });
+
+    expect(mockedDeletePhotos).toHaveBeenCalledWith(loaded.visits[0].photoUris);
+    expect(current.data.visits).toEqual([]);
+  });
+
+  test('removes photos dropped by a visit edit after the edit is saved', async () => {
+    const loaded: AppData = {
+      restaurants: [{ id: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z' }],
+      menus: [{ id: 'menu-1', restaurantId: 'restaurant-1', name: 'Soba', createdAt: '2026-08-01T00:00:00.000Z' }],
+      visits: [{
+        id: 'visit-1', restaurantId: 'restaurant-1', visitedAt: '2026-08-20T12:00:00.000Z',
+        service: 3, atmosphere: 4, photoUris: [
+          'file:///documents/visit-photos/keep.jpg',
+          'file:///documents/visit-photos/remove.jpg',
+        ],
+      }],
+      menuRatings: [{ id: 'rating-1', visitId: 'visit-1', menuId: 'menu-1', taste: 3, value: 4 }],
+    };
+    mockedLoadAppData.mockResolvedValue(loaded);
+    mockedSaveAppData.mockResolvedValue();
+    await renderProvider();
+
+    await act(async () => {
+      await current.updateVisit({
+        id: 'visit-1',
+        visitedAt: '2026-08-20T12:00:00.000Z',
+        service: 3,
+        atmosphere: 4,
+        photoUris: ['file:///documents/visit-photos/keep.jpg'],
+        menuRatings: [{ id: 'rating-1', taste: 3, value: 4 }],
+      });
+    });
+
+    expect(current.data.visits[0].photoUris).toEqual(['file:///documents/visit-photos/keep.jpg']);
+    expect(mockedDeletePhotos).toHaveBeenCalledWith(['file:///documents/visit-photos/remove.jpg']);
   });
 
   test('edits and deletes records through the persistence queue', async () => {
