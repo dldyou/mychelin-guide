@@ -22,6 +22,8 @@ export default function GuideScreen() {
     getRestaurantSummaries(data, DEFAULT_SCORE_POLICY),
     sort,
   );
+  const wantToVisit = summaries.filter(({ visitCount }) => visitCount === 0);
+  const visited = summaries.filter(({ visitCount }) => visitCount > 0);
 
   return (
     <Screen>
@@ -67,20 +69,45 @@ export default function GuideScreen() {
         {!isLoading && !error && summaries.length === 0 ? (
           <Text style={styles.message}>아직 등록된 식당이 없어요.</Text>
         ) : null}
-        {!isLoading && !error ? summaries.map((summary) => (
-          <RestaurantCard
-            key={summary.restaurant.id}
-            restaurant={summary.restaurant}
-            score={summary.score}
-            visitCount={summary.visitCount}
-            onPress={() => router.push({
-              pathname: '/restaurant/[id]',
-              params: { id: summary.restaurant.id },
-            })}
-          />
-        )) : null}
+        {!isLoading && !error && wantToVisit.length > 0 ? (
+          <GuideSection heading="가보고 싶은 곳" summaries={wantToVisit} onPress={(id) => router.push({
+            pathname: '/restaurant/[id]',
+            params: { id },
+          })} />
+        ) : null}
+        {!isLoading && !error && visited.length > 0 ? (
+          <GuideSection heading="방문한 곳" summaries={visited} onPress={(id) => router.push({
+            pathname: '/restaurant/[id]',
+            params: { id },
+          })} />
+        ) : null}
       </View>
     </Screen>
+  );
+}
+
+function GuideSection({
+  heading,
+  summaries,
+  onPress,
+}: {
+  heading: string;
+  summaries: ReturnType<typeof getRestaurantSummaries>;
+  onPress(id: string): void;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.heading}>{heading}</Text>
+      {summaries.map((summary) => (
+        <RestaurantCard
+          key={summary.restaurant.id}
+          restaurant={summary.restaurant}
+          score={summary.score}
+          visitCount={summary.visitCount}
+          onPress={() => onPress(summary.restaurant.id)}
+        />
+      ))}
+    </View>
   );
 }
 
@@ -134,6 +161,14 @@ const styles = StyleSheet.create({
   results: {
     gap: 12,
     marginTop: 24,
+  },
+  section: {
+    gap: 12,
+  },
+  heading: {
+    color: colors.ink,
+    fontSize: 20,
+    fontWeight: '700',
   },
   message: {
     color: colors.muted,
