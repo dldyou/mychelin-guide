@@ -1,4 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/src/components/Screen';
@@ -6,6 +8,7 @@ import { getRestaurantSummary } from '@/src/domain/restaurantSummary';
 import { DEFAULT_SCORE_POLICY } from '@/src/domain/scorePolicy';
 import { useAppData } from '@/src/state/AppDataProvider';
 import { colors } from '@/src/theme/colors';
+import { buildRestaurantMapUrl } from '@/src/utils/mapUrl';
 
 const daypartLabels = {
   breakfast: '아침',
@@ -14,11 +17,14 @@ const daypartLabels = {
   'late-night': '야식',
 } as const;
 
+const mapOpenError = '지도를 열지 못했어요. 다시 시도해 주세요.';
+
 export default function RestaurantDetailScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const restaurantId = typeof params.id === 'string' ? params.id : undefined;
   const router = useRouter();
   const { data, isLoading, error } = useAppData();
+  const [mapError, setMapError] = useState<string | null>(null);
   const summary = restaurantId
     ? getRestaurantSummary(restaurantId, data, DEFAULT_SCORE_POLICY)
     : null;
@@ -61,6 +67,14 @@ export default function RestaurantDetailScreen() {
   }
 
   const formattedScore = summary.score === null ? '평가 전' : summary.score.toFixed(1);
+  const openMap = async () => {
+    setMapError(null);
+    try {
+      await Linking.openURL(buildRestaurantMapUrl(summary.restaurant));
+    } catch {
+      setMapError(mapOpenError);
+    }
+  };
 
   return (
     <Screen>
@@ -72,6 +86,18 @@ export default function RestaurantDetailScreen() {
           <Text style={styles.metric}>{`방문 ${summary.visitCount}회 · 개인 점수 ${formattedScore}`}</Text>
           {summary.recentChange !== null ? (
             <Text style={styles.metric}>{`최근 변화 ${summary.recentChange > 0 ? '+' : ''}${summary.recentChange.toFixed(1)}`}</Text>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={openMap}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.secondaryButtonText}>지도에서 열기</Text>
+          </Pressable>
+          {mapError ? (
+            <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>
+              {mapError}
+            </Text>
           ) : null}
           <Pressable
             accessibilityRole="button"
