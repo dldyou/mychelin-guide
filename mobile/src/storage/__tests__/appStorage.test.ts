@@ -1,14 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { createEmptyAppData } from '../../domain/appData';
-import { AppDataRecoveryError, loadAppData, saveAppData } from '../appStorage';
+import { createEmptyAppData, type AppData } from '../../domain/appData';
+import {
+  AppDataRecoveryError,
+  loadAppData,
+  parseAppDataBackup,
+  saveAppData,
+  serializeAppDataBackup,
+} from '../appStorage';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
 describe('appStorage', () => {
-  const createValidData = () => ({
+  const createValidData = (): AppData => ({
     restaurants: [{ id: 'restaurant-1', name: 'Noodle House', createdAt: '2026-07-31' }],
     menus: [{ id: 'menu-1', restaurantId: 'restaurant-1', name: 'Noodles', createdAt: '2026-07-31' }],
     visits: [{
@@ -132,4 +138,35 @@ describe('appStorage', () => {
 
     await expect(saveAppData(createEmptyAppData())).rejects.toBe(error);
   });
+
+  it('serializes a versioned backup without photo references', () => {
+    const data = createValidData();
+    data.visits[0].photoUris = ['file:///private/meal.jpg'];
+
+    expect(JSON.parse(serializeAppDataBackup(data))).toEqual({
+      version: 1,
+      data: {
+        ...data,
+        visits: [{ ...data.visits[0], photoUris: [] }],
+      },
+    });
+    expect(data.visits[0].photoUris).toEqual(['file:///private/meal.jpg']);
+  });
+
+  it('validates a backup and clears imported photo references', () => {
+    const data = createValidData();
+    data.visits[0].photoUris = ['file:///another-device/meal.jpg'];
+
+    expect(parseAppDataBackup(JSON.stringify({ version: 1, data }))).toEqual({
+      ...data,
+      visits: [{ ...data.visits[0], photoUris: [] }],
+    });
+  });
+
+  it.each(['not json', JSON.stringify({ version: 1, data: { ...createEmptyAppData(), visits: {} } })])(
+    'rejects an invalid backup document',
+    (document) => {
+      expect(() => parseAppDataBackup(document)).toThrow(AppDataRecoveryError);
+    },
+  );
 });

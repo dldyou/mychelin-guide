@@ -14,7 +14,7 @@ import {
   type Restaurant,
   type Visit,
 } from '../../domain/appData';
-import { loadAppData, saveAppData } from '../../storage/appStorage';
+import { AppDataRecoveryError, loadAppData, saveAppData } from '../../storage/appStorage';
 import {
   AppDataProvider,
   type AppDataContextValue,
@@ -22,7 +22,11 @@ import {
   useAppData,
 } from '../AppDataProvider';
 
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
 jest.mock('../../storage/appStorage', () => ({
+  ...jest.requireActual('../../storage/appStorage'),
   loadAppData: jest.fn(),
   saveAppData: jest.fn(),
 }));
@@ -117,6 +121,50 @@ describe('AppDataProvider', () => {
     expect(mockedSaveAppData).not.toHaveBeenCalled();
     expect(current.data).toEqual(createEmptyAppData());
     expect(current.error).toBe(loadError);
+  });
+
+  test('replaces corrupt hydrated data and allows normal mutations afterward', async () => {
+    const loadError = new AppDataRecoveryError();
+    const replacement: AppData = {
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-imported', name: 'Imported', createdAt: '2026-08-01T00:00:00.000Z' }],
+    };
+    mockedLoadAppData.mockRejectedValue(loadError);
+    mockedSaveAppData.mockResolvedValue();
+    await renderProvider();
+
+    await act(async () => {
+      await current.replaceData(replacement);
+    });
+
+    expect(current.data).toEqual(replacement);
+    expect(current.error).toBeNull();
+
+    let restaurant!: Restaurant;
+    await act(async () => {
+      restaurant = await current.addRestaurant({ name: 'After recovery' });
+    });
+    expect(current.data.restaurants).toEqual([replacement.restaurants[0], restaurant]);
+    expect(mockedSaveAppData).toHaveBeenCalledTimes(2);
+  });
+
+  test('keeps hydration mutations blocked when replacement persistence fails', async () => {
+    const loadError = new AppDataRecoveryError();
+    const saveError = new Error('disk full');
+    mockedLoadAppData.mockRejectedValue(loadError);
+    mockedSaveAppData.mockRejectedValueOnce(saveError);
+    await renderProvider();
+
+    await act(async () => {
+      await expect(current.replaceData(createEmptyAppData())).rejects.toBe(saveError);
+    });
+    await act(async () => {
+      await expect(current.addRestaurant({ name: 'Still blocked' })).rejects.toBe(loadError);
+    });
+
+    expect(current.data).toEqual(createEmptyAppData());
+    expect(current.error).toBe(saveError);
+    expect(mockedSaveAppData).toHaveBeenCalledTimes(1);
   });
 
   test('publishes a restaurant only after persistence succeeds', async () => {
@@ -309,6 +357,62 @@ describe('AppDataProvider', () => {
     });
 
     expect(current.data.restaurants).toEqual([]);
+    expect(current.error).toBe(saveError);
+  });
+
+  test('publishes replacement data only after persistence succeeds', async () => {
+    const original: AppData = {
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-old', name: 'Old', createdAt: '2026-08-01T00:00:00.000Z' }],
+    };
+    const replacement: AppData = {
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-new', name: 'New', createdAt: '2026-08-02T00:00:00.000Z' }],
+    };
+    mockedLoadAppData.mockResolvedValue(original);
+    let resolveSave!: () => void;
+    mockedSaveAppData.mockReturnValue(new Promise((resolve) => {
+      resolveSave = resolve;
+    }));
+    await renderProvider();
+
+    let mutation!: Promise<void>;
+    act(() => {
+      mutation = current.replaceData(replacement);
+    });
+    replacement.restaurants[0].name = 'Mutated after request';
+    await act(async () => Promise.resolve());
+
+    expect(current.data).toEqual(original);
+    expect(mockedSaveAppData).toHaveBeenCalledWith({
+      ...replacement,
+      restaurants: [{ ...replacement.restaurants[0], name: 'New' }],
+    });
+
+    await act(async () => resolveSave());
+    await mutation;
+    expect(current.data.restaurants[0].name).toBe('New');
+  });
+
+  test('preserves current data when replacement persistence fails', async () => {
+    const original: AppData = {
+      ...createEmptyAppData(),
+      restaurants: [{ id: 'restaurant-old', name: 'Old', createdAt: '2026-08-01T00:00:00.000Z' }],
+    };
+    const saveError = new Error('disk full');
+    mockedLoadAppData.mockResolvedValue(original);
+    mockedSaveAppData.mockRejectedValue(saveError);
+    await renderProvider();
+
+    let mutation!: Promise<void>;
+    act(() => {
+      mutation = current.replaceData(createEmptyAppData());
+    });
+    await act(async () => {
+      await expect(mutation).rejects.toBe(saveError);
+    });
+
+    expect(current.data).toEqual(original);
     expect(current.error).toBe(saveError);
   });
 

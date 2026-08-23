@@ -42,6 +42,7 @@ export type AppDataContextValue = {
   addRestaurant(input: Pick<Restaurant, 'name' | 'category' | 'address'>): Promise<Restaurant>;
   addMenu(input: Pick<Menu, 'restaurantId' | 'name'>): Promise<Menu>;
   addVisit(input: NewVisitInput): Promise<Visit>;
+  replaceData(data: AppData): Promise<void>;
 };
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
@@ -94,12 +95,14 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
 
   const enqueueMutation = <T,>(
     build: (currentData: AppData) => { nextData: AppData; result: T },
+    recoversHydration = false,
   ): Promise<T> => {
     const mutation = mutationQueue.current.then(async () => {
       await hydration.promise;
-      if (hydrationErrorRef.current) throw hydrationErrorRef.current;
+      if (hydrationErrorRef.current && !recoversHydration) throw hydrationErrorRef.current;
       const { nextData, result } = build(dataRef.current);
       await persist(nextData);
+      if (recoversHydration) hydrationErrorRef.current = null;
       return result;
     });
     mutationQueue.current = mutation.then(() => undefined, () => undefined);
@@ -176,6 +179,11 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
     });
   };
 
+  const replaceData = (nextData: AppData): Promise<void> => {
+    const snapshot = JSON.parse(JSON.stringify(nextData)) as AppData;
+    return enqueueMutation(() => ({ nextData: snapshot, result: undefined }), true);
+  };
+
   return (
     <AppDataContext.Provider value={{
       data,
@@ -184,6 +192,7 @@ export function AppDataProvider({ children }: PropsWithChildren): React.JSX.Elem
       addRestaurant,
       addMenu,
       addVisit,
+      replaceData,
     }}>
       {children}
     </AppDataContext.Provider>

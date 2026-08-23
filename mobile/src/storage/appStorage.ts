@@ -76,6 +76,26 @@ export const migrateStoredAppData = (value: unknown): AppData => {
   throw new AppDataRecoveryError();
 };
 
+const withoutPhotoUris = (data: AppData): AppData => ({
+  ...data,
+  visits: data.visits.map((visit) => ({ ...visit, photoUris: [] })),
+});
+
+export const serializeAppDataBackup = (data: AppData): string => JSON.stringify({
+  version: APP_DATA_VERSION,
+  data: withoutPhotoUris(data),
+}, null, 2);
+
+export const parseAppDataBackup = (document: string): AppData => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(document);
+  } catch {
+    throw new AppDataRecoveryError();
+  }
+  return withoutPhotoUris(migrateStoredAppData(parsed));
+};
+
 export const loadAppData = async (): Promise<AppData> => {
   const saved = await AsyncStorage.getItem(APP_DATA_KEY);
   if (saved === null) return createEmptyAppData();
