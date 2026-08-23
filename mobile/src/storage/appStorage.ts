@@ -4,6 +4,14 @@ import { createEmptyAppData, type AppData } from '../domain/appData';
 import { parseIsoDate } from '../domain/scoring';
 
 const APP_DATA_KEY = 'mychelin-data-v1';
+const APP_DATA_VERSION = 1;
+
+export class AppDataRecoveryError extends Error {
+  constructor() {
+    super('저장된 기록을 불러올 수 없습니다. 원본 데이터는 유지되었습니다.');
+    this.name = 'AppDataRecoveryError';
+  }
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -59,16 +67,29 @@ const isAppData = (value: unknown): value is AppData => {
     });
 };
 
-export const loadAppData = async (): Promise<AppData> => {
-  const saved = await AsyncStorage.getItem(APP_DATA_KEY);
-  if (!saved) return createEmptyAppData();
-
-  try {
-    const parsed: unknown = JSON.parse(saved);
-    return isAppData(parsed) ? parsed : createEmptyAppData();
-  } catch {
-    return createEmptyAppData();
+export const migrateStoredAppData = (value: unknown): AppData => {
+  if (isRecord(value) && 'version' in value) {
+    if (value.version === APP_DATA_VERSION && isAppData(value.data)) return value.data;
+    throw new AppDataRecoveryError();
   }
+  if (isAppData(value)) return value;
+  throw new AppDataRecoveryError();
 };
 
-export const saveAppData = (data: AppData) => AsyncStorage.setItem(APP_DATA_KEY, JSON.stringify(data));
+export const loadAppData = async (): Promise<AppData> => {
+  const saved = await AsyncStorage.getItem(APP_DATA_KEY);
+  if (saved === null) return createEmptyAppData();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(saved);
+  } catch {
+    throw new AppDataRecoveryError();
+  }
+  return migrateStoredAppData(parsed);
+};
+
+export const saveAppData = (data: AppData) => AsyncStorage.setItem(
+  APP_DATA_KEY,
+  JSON.stringify({ version: APP_DATA_VERSION, data }),
+);

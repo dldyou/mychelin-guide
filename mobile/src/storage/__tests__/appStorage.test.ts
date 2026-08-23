@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { createEmptyAppData } from '../../domain/appData';
-import { loadAppData, saveAppData } from '../appStorage';
+import { AppDataRecoveryError, loadAppData, saveAppData } from '../appStorage';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
@@ -37,11 +37,14 @@ describe('appStorage', () => {
     });
   });
 
-  it('restores a saved restaurant and visit with the same fields', async () => {
+  it('saves an explicitly versioned document and restores its data', async () => {
     const data = createValidData();
 
     await saveAppData(data);
-    expect(AsyncStorage.setItem).toHaveBeenCalledWith('mychelin-data-v1', JSON.stringify(data));
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      'mychelin-data-v1',
+      JSON.stringify({ version: 1, data }),
+    );
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(
       (AsyncStorage.setItem as jest.Mock).mock.calls[0][1],
     );
@@ -50,10 +53,19 @@ describe('appStorage', () => {
     expect(AsyncStorage.getItem).toHaveBeenCalledWith('mychelin-data-v1');
   });
 
-  it('returns empty data when the saved document is not valid JSON', async () => {
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValue('{not-json');
+  it('migrates the current unversioned document without changing its data', async () => {
+    const data = createValidData();
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(data));
 
-    await expect(loadAppData()).resolves.toEqual(createEmptyAppData());
+    await expect(loadAppData()).resolves.toEqual(data);
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it.each(['', '{not-json'])('rejects a stable recovery error without overwriting invalid JSON', async (saved) => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(saved);
+
+    await expect(loadAppData()).rejects.toEqual(new AppDataRecoveryError());
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -66,10 +78,11 @@ describe('appStorage', () => {
       visits: [],
       menuRatings: [{ id: 'rating-1', visitId: 'visit-1', menuId: 'menu-1', taste: 0, value: 5 }],
     },
-  ])('returns empty data when the saved document has an invalid shape', async (saved) => {
+  ])('rejects a recovery error when the saved document has an invalid shape', async (saved) => {
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(saved));
 
-    await expect(loadAppData()).resolves.toEqual(createEmptyAppData());
+    await expect(loadAppData()).rejects.toEqual(new AppDataRecoveryError());
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -84,12 +97,33 @@ describe('appStorage', () => {
       },
     },
     { name: 'visits without menu ratings', mutate: (data: ReturnType<typeof createValidData>) => { data.menuRatings = []; } },
-  ])('returns empty data for $name', async ({ mutate }) => {
+  ])('rejects a recovery error for $name without overwriting storage', async ({ mutate }) => {
     const data = createValidData();
     mutate(data);
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(data));
 
-    await expect(loadAppData()).resolves.toEqual(createEmptyAppData());
+    await expect(loadAppData()).rejects.toEqual(new AppDataRecoveryError());
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unsupported schema version without overwriting storage', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify({
+      version: 2,
+      data: createValidData(),
+    }));
+
+    await expect(loadAppData()).rejects.toEqual(new AppDataRecoveryError());
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it('rejects a versioned document whose data is corrupt without overwriting storage', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify({
+      version: 1,
+      data: { ...createEmptyAppData(), restaurants: {} },
+    }));
+
+    await expect(loadAppData()).rejects.toEqual(new AppDataRecoveryError());
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
   });
 
   it('rejects when storage cannot persist the document', async () => {
